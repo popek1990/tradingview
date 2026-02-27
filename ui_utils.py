@@ -1,41 +1,89 @@
-import streamlit as st
+import html
 import os
-import requests
-from config import Ustawienia
 
+import requests
+import streamlit as st
+from dotenv import set_key
+
+from config import Settings
+
+# Shared constants — single source of truth for frontend
+WEBHOOK_URL = os.getenv("WEBHOOK_URL", "http://localhost:80")
+ENV_FILE_PATH = ".env"
+
+
+@st.cache_data(ttl=30)
 def check_system_status():
-    """Sprawdza statusy polaczen dla naglowka."""
-    ust = Ustawienia()
+    """Checks connection statuses for header (cached 30s)."""
+    settings = Settings()
     status = {
-        "tg": bool(ust.tg_token and ust.kanal),
-        "dc": bool(ust.discord_webhook),
-        "sl": bool(ust.slack_webhook),
-        "key": bool(ust.sec_key),
+        "tg": bool(settings.tg_token and settings.channel),
+        "dc": bool(settings.discord_webhook),
+        "sl": bool(settings.slack_webhook),
+        "key": bool(settings.sec_key),
         "srv": False
     }
-    
-    # Check Webhook Server (FastAPI)
-    WEBHOOK_URL = os.getenv("WEBHOOK_URL", "http://localhost:80")
+
     try:
         resp = requests.get(f"{WEBHOOK_URL}/health", timeout=1)
         if resp.status_code == 200:
             status["srv"] = True
     except Exception:
         pass
-        
+
     return status
 
+
+def save_and_reload(fields: dict) -> None:
+    """Saves fields to .env and reloads webhook server config.
+
+    Displays st.success/error/warning messages.
+    """
+    settings = Settings()
+    old_sec_key = settings.sec_key
+
+    write_errors = []
+    for key, value in fields.items():
+        success, _, _ = set_key(ENV_FILE_PATH, key, value)
+        if not success:
+            write_errors.append(key)
+
+    if write_errors:
+        st.error(f"WRITE FAILED: {', '.join(write_errors)}")
+        st.stop()
+
+    st.success("CONFIGURATION PERSISTED TO .ENV")
+    st.toast("Persisted!")
+
+    try:
+        resp = requests.post(
+            f"{WEBHOOK_URL}/reload-config",
+            json={"key": old_sec_key},
+            timeout=5,
+        )
+        if resp.status_code == 200:
+            st.success("WEBHOOK SERVER: CONFIG RELOADED")
+        else:
+            st.warning(f"WEBHOOK SERVER: RELOAD FAILED (HTTP {resp.status_code})")
+    except Exception:
+        st.info("WEBHOOK SERVER: UNREACHABLE (Manual restart required)")
+
+
+def safe_html(text: str) -> str:
+    """Escapes HTML — protects against XSS in unsafe_allow_html."""
+    return html.escape(text)
+
 def render_ui_header():
-    """Renderuje wspolny naglowek i wstrzykuje globalny CSS Matrix Style."""
-    
-    # Globalny CSS Matrix/Minimalist
+    """Renders shared header and injects global CSS Matrix Style."""
+
+    # Global CSS Matrix/Minimalist
     st.markdown("""
         <style>
-        .stApp { 
-            background-color: #0D1117; 
+        .stApp {
+            background-color: #0D1117;
             color: #C9D1D9;
         }
-        
+
         /* Medium width constraint */
         [data-testid="stMainViewContainer"] > div:first-child {
             max-width: 1200px;
@@ -44,21 +92,21 @@ def render_ui_header():
 
         html, body, [class*="css"] { font-family: 'Courier New', Courier, monospace !important; }
 
-        /* Logout button styling in header - shrunk and moved lower */
+        /* Logout button styling in header */
         div[data-testid="column"]:nth-child(3) {
             display: flex;
             justify-content: flex-end;
             align-items: flex-end;
-            padding-bottom: 5px; /* Moved lower by reducing bottom padding */
+            padding-bottom: 5px;
         }
-        
+
         div[data-testid="column"]:nth-child(3) button {
             font-size: 11px !important;
             padding: 2px 10px !important;
             min-height: 25px !important;
             line-height: 1 !important;
         }
-        
+
         h1, h2, h3, .stMetric label { color: #00FF41 !important; text-transform: uppercase; letter-spacing: 1px; }
 
         .stButton > button {
@@ -83,7 +131,7 @@ def render_ui_header():
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
         header {visibility: hidden;}
-        
+
         .terminal-log {
             background-color: #000000 !important;
             color: #00FF41 !important;
@@ -92,27 +140,30 @@ def render_ui_header():
             font-family: 'Courier New', monospace;
             border: 1px solid #30363D;
         }
-        
+
         [data-testid="stSidebar"] { background-color: #161B22 !important; border-right: 1px solid #30363D; }
-        
+
         /* Tooltip style */
         .status-dot { cursor: help; border-bottom: 1px dotted rgba(255,255,255,0.2); padding: 2px; }
         </style>
     """, unsafe_allow_html=True)
 
-    # Naglowek Logo + Tytul + Logout
+    # Header: Logo + Title + Logout
     c1, c2, c3 = st.columns([0.1, 1, 0.15])
     with c1:
-        if os.path.exists("viking_logo.jpg"):
-            st.image("viking_logo.jpg", width=80)
+        logo_path = os.path.join(os.path.dirname(__file__), "viking_logo.jpg")
+        if os.path.exists(logo_path):
+            st.image(logo_path, width=80)
+        else:
+            st.markdown("### ⚡")
     with c2:
         st.markdown(f"""
             <div style="padding-top: 5px;">
                 <h1 style="margin: 0; font-size: 28px;">⚠️ TradingView Alerts to Discord, Telegram or Slack</h1>
             </div>
         """, unsafe_allow_html=True)
-        
-        # Status dots like tgramai
+
+        # Status dots
         stats = check_system_status()
         s_tg = "🟢" if stats["tg"] else "🔴"
         s_dc = "🟢" if stats["dc"] else "🔴"
@@ -128,18 +179,18 @@ def render_ui_header():
 
         st.markdown(f"""
             <div style="font-size: 13px; opacity: 0.9; margin-top: 5px; margin-bottom: 10px;">
-                <span title="{t_srv}" class="status-dot">{s_srv} Webhook Server</span> |
-                <span title="{t_key}" class="status-dot">{s_key} Auth Key</span> |
-                <span title="{t_tg}" class="status-dot">{s_tg} Telegram</span> |
-                <span title="{t_dc}" class="status-dot">{s_dc} Discord</span> |
-                <span title="{t_sl}" class="status-dot">{s_sl} Slack</span>
+                <span title="{safe_html(t_srv)}" class="status-dot">{s_srv} Webhook Server</span> |
+                <span title="{safe_html(t_key)}" class="status-dot">{s_key} Auth Key</span> |
+                <span title="{safe_html(t_tg)}" class="status-dot">{s_tg} Telegram</span> |
+                <span title="{safe_html(t_dc)}" class="status-dot">{s_dc} Discord</span> |
+                <span title="{safe_html(t_sl)}" class="status-dot">{s_sl} Slack</span>
             </div>
         """, unsafe_allow_html=True)
     st.markdown("---")
-    return c3  # Zwracamy kolumne dla przycisku logout
+    return c3  # Return column for logout button
 
 def render_sidebar_info():
-    """Wyswietla dodatkowe info w sidebarze."""
+    """Displays additional info in sidebar."""
     with st.sidebar:
         st.markdown("---")
         st.markdown("""
