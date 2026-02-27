@@ -64,12 +64,14 @@ def sprawdz_logowanie():
         is_logged_in = True
 
     if is_logged_in:
-        with st.sidebar:
-            if st.button("Wyloguj", key="logout_btn"):
-                st.session_state["force_logout"] = True
-                st.session_state["auth_success"] = False
-                cookie_manager.delete(COOKIE_NAME)
-                st.rerun()
+        # Logout button in top right
+        st.markdown('<div class="logout-container">', unsafe_allow_html=True)
+        if st.button("🚪 Logout", key="logout_btn"):
+            st.session_state["force_logout"] = True
+            st.session_state["auth_success"] = False
+            cookie_manager.delete(COOKIE_NAME)
+            st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
         return
 
     # --- Ekran logowania ---
