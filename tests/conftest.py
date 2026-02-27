@@ -12,6 +12,7 @@ TEST_ENV = {
     "WYSLIJ_ALERTY_TELEGRAM": "False",
     "WYSLIJ_ALERTY_DISCORD": "False",
     "WYSLIJ_ALERTY_SLACK": "False",
+    "KANAL_2": "",
     "DISCORD_WEBHOOK": "",
     "SLACK_WEBHOOK": "",
 }

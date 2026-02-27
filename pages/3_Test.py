@@ -10,7 +10,7 @@ sprawdz_logowanie()
 
 WEBHOOK_URL = os.getenv("WEBHOOK_URL", "http://localhost:80")
 
-st.title("Wyslij alert testowy")
+st.title("🧪 Wyslij alert testowy")
 st.caption("Wysyla testowy alert przez serwer webhook (pelny pipeline)")
 
 ust = Ustawienia()
@@ -29,7 +29,7 @@ with st.form("formularz_testu"):
     discord_override = st.text_input("ID webhooka Discord (opcjonalnie)")
     slack_override = st.text_input("ID webhooka Slack (opcjonalnie)")
 
-    wyslij = st.form_submit_button("Wyslij testowy alert")
+    wyslij = st.form_submit_button("Wyslij testowy alert", use_container_width=True)
 
 if wyslij:
     if not ust.sec_key:
@@ -56,6 +56,7 @@ if wyslij:
         )
         if resp.status_code == 200:
             st.success("Alert testowy wyslany pomyslnie!")
+            st.toast("✅ Alert wyslany!")
             st.json(resp.json())
         else:
             st.error(f"Blad: HTTP {resp.status_code}")
