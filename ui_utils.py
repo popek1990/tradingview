@@ -44,12 +44,19 @@ def render_ui_header():
 
         html, body, [class*="css"] { font-family: 'Courier New', Courier, monospace !important; }
 
-        /* Logout button styling in header */
+        /* Logout button styling in header - shrunk and moved lower */
         div[data-testid="column"]:nth-child(3) {
             display: flex;
             justify-content: flex-end;
             align-items: flex-end;
-            padding-bottom: 15px;
+            padding-bottom: 5px; /* Moved lower by reducing bottom padding */
+        }
+        
+        div[data-testid="column"]:nth-child(3) button {
+            font-size: 11px !important;
+            padding: 2px 10px !important;
+            min-height: 25px !important;
+            line-height: 1 !important;
         }
         
         h1, h2, h3, .stMetric label { color: #00FF41 !important; text-transform: uppercase; letter-spacing: 1px; }
@@ -94,7 +101,7 @@ def render_ui_header():
     """, unsafe_allow_html=True)
 
     # Naglowek Logo + Tytul + Logout
-    c1, c2, c3 = st.columns([0.15, 1, 0.2])
+    c1, c2, c3 = st.columns([0.1, 1, 0.15])
     with c1:
         if os.path.exists("viking_logo.jpg"):
             st.image("viking_logo.jpg", width=80)
