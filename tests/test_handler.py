@@ -104,6 +104,34 @@ class TestWyslijAlert:
 
         assert wyniki["slack"] is False
 
+    @patch("handler._pobierz_tg_bot")
+    def test_telegram_2_wyslano(self, mock_bot, monkeypatch):
+        """Telegram wysyla na dwie grupy gdy kanal_2 ustawiony."""
+        monkeypatch.setenv("WYSLIJ_ALERTY_TELEGRAM", "True")
+        monkeypatch.setenv("KANAL_2", "-100druga_grupa")
+        mock_instance = MagicMock()
+        mock_bot.return_value = mock_instance
+
+        wyniki = wyslij_alert({"msg": "test dwie grupy"})
+
+        assert wyniki["telegram"] is True
+        assert wyniki["telegram_2"] is True
+        assert mock_instance.sendMessage.call_count == 2
+
+    @patch("handler._pobierz_tg_bot")
+    def test_telegram_2_pusty_pomijany(self, mock_bot, monkeypatch):
+        """Telegram nie wysyla na grupe 2 gdy kanal_2 pusty."""
+        monkeypatch.setenv("WYSLIJ_ALERTY_TELEGRAM", "True")
+        monkeypatch.setenv("KANAL_2", "")
+        mock_instance = MagicMock()
+        mock_bot.return_value = mock_instance
+
+        wyniki = wyslij_alert({"msg": "test jedna grupa"})
+
+        assert wyniki["telegram"] is True
+        assert "telegram_2" not in wyniki
+        mock_instance.sendMessage.assert_called_once()
+
     @patch("handler.DiscordWebhook")
     def test_discord_embed_krotki_msg(self, mock_webhook_cls, monkeypatch):
         """Discord — krotka wiadomosc trafia do title."""

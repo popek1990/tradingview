@@ -11,9 +11,9 @@ TradingView-Webhook-Bot — serwer webhook (FastAPI) odbierajacy alerty z Tradin
 ## Uruchamianie
 
 ```bash
-# Docker (zalecane)
-docker-compose build
-docker-compose up
+# Docker (zalecane) — produkcja
+docker compose build
+docker compose up -d
 # -> webhook: http://HOST:80/webhook (port 80 wymagany przez TradingView)
 # -> panel:   http://localhost:8501 (tylko localhost)
 
@@ -24,11 +24,33 @@ uvicorn main:app --host 0.0.0.0 --port 80
 # Lokalnie — panel Streamlit (osobny terminal)
 streamlit run streamlit_app.py
 
-# Testy
+# Testy (wymaga venv z zainstalowanymi requirements.txt)
 pytest                       # wszystkie testy
 pytest tests/test_handler.py # pojedynczy plik
 pytest -k "test_telegram"   # testy po nazwie
 ```
+
+### Wdrozenie na nowym serwerze
+
+```bash
+git clone https://github.com/popek1990/Tradingview.git
+cd Tradingview
+# Stworz .env z credentials (nie jest w repo)
+cat > .env << 'EOF'
+SEC_KEY=twoj_klucz
+DASHBOARD_HASLO=twoje_haslo
+TG_TOKEN=twoj_token_telegram
+DISCORD_WEBHOOK=
+SLACK_WEBHOOK=
+EOF
+docker compose build && docker compose up -d
+```
+
+## Repozytorium
+
+- **GitHub:** https://github.com/popek1990/Tradingview (prywatne)
+- **Branch:** main
+- `.env` i `plan.md` sa w `.gitignore` — NIE trafiaja do repo
 
 ## Zaleznosci (requirements.txt)
 
@@ -39,6 +61,7 @@ pytest -k "test_telegram"   # testy po nazwie
 | `pydantic-settings` | >=2.1.0 | Klasa `Ustawienia(BaseSettings)` — config z .env |
 | `python-dotenv` | >=1.0.0 | `set_key()` do zapisu .env z panelu Streamlit |
 | `python-telegram-bot` | ==13.6 | Sync API Telegram (v13, NIE v20+) |
+| `urllib3` | <2 | Wymagane przez python-telegram-bot 13.6 (v2 usunal potrzebne moduly) |
 | `discord-webhook` | >=1.0.0 | Wysylanie embeddow na Discord |
 | `requests` | >=2.28.0 | HTTP client (Slack webhook, healthcheck) |
 | `slowapi` | >=0.1.9 | Rate limiting endpointow |
@@ -67,8 +90,8 @@ tradingview/
     test_config.py         # Testy konfiguracji i parsowania
     test_webhook.py        # Testy endpointow FastAPI
     test_handler.py        # Testy handlera z mockowanymi kanalami
-  .env                     # Wrazliwe dane (tokeny, hasla) — w .gitignore
-  .gitignore               # Ignorowane pliki (venv, __pycache__, .env, *.log)
+  .env                     # Wrazliwe dane (tokeny, hasla) — w .gitignore, NIE w repo
+  .gitignore               # Ignorowane pliki (venv, __pycache__, .env, plan.md, backups)
   .dockerignore            # Wykluczone z obrazu Docker (git, venv, backups, assets, *.md)
   Dockerfile               # Obraz webhook (python:3.12-slim, port 1990)
   Dockerfile.streamlit     # Obraz panelu Streamlit (port 8501)
@@ -78,7 +101,6 @@ tradingview/
   LICENSE                  # MIT
   README.md                # Oryginalny README (PRZESTARZALY — opisuje Flask, Twitter, Python 3.8)
   logs/                    # Logi serwera (tworzony automatycznie, wspoldzielony volume Docker)
-  backups/                 # Archiwalne wersje projektu (ZIP)
   assets/                  # Logo projektu (z oryginalnego repo)
 ```
 
@@ -145,7 +167,7 @@ Klasa `Ustawienia(BaseSettings)` z pydantic-settings — **jedno zrodlo prawdy**
 
 ### Docker
 
-- **Dockerfile** — `python:3.12-slim`, non-root user (`appuser`), EXPOSE 1990, HEALTHCHECK na `/health`, graceful shutdown (`--timeout-graceful-shutdown 10`), `.env` NIE kopiowany (montowany jako volume)
+- **Dockerfile** — `python:3.12-slim`, non-root user (`appuser`), katalog `logs` z uprawnieniami appuser, EXPOSE 1990, HEALTHCHECK na `/health`, graceful shutdown (`--timeout-graceful-shutdown 10`), `.env` NIE kopiowany (montowany jako volume)
 - **Dockerfile.streamlit** — osobny obraz, non-root user (`appuser`), port 8501, HEALTHCHECK na `/_stcore/health`
 - **docker-compose.yml** — serwis `webhook` (80->1990, 256M RAM, 0.5 CPU) + serwis `dashboard` (127.0.0.1:8501, 512M RAM, 0.5 CPU), wspoldzielony `.env` i `logi` (named volume) przez volume mount. Limity zasobow przez `deploy.resources.limits`.
 
@@ -158,10 +180,10 @@ Opcjonalne nadpisania: `WYSLIJ_ALERTY_TELEGRAM`, `WYSLIJ_ALERTY_DISCORD`, `WYSLI
 ## Wazne uwagi
 
 - **Port 80** jest wymagany przez TradingView — nie zmieniac mapowania hosta w docker-compose.
-- `.env` nigdy nie jest COPY do obrazu Docker — montowany jako volume.
-- `python-telegram-bot==13.6` (sync API) — wywolywane przez `asyncio.to_thread()`. Upgrade do 20+ wymagalby przepisania na async.
+- `.env` nigdy nie jest COPY do obrazu Docker — montowany jako volume. NIE jest w repo (`.gitignore`).
+- `python-telegram-bot==13.6` (sync API) — wywolywane przez `asyncio.to_thread()`. Wymaga `urllib3<2`. Upgrade do 20+ wymagalby przepisania na async.
 - **Twitter/X usuniety** — tweepy API v1.1 nie dziala na darmowym planie. Kanal calkowicie usuniety z kodu i konfiguracji.
 - **Email usuniety** — TradingView ma wbudowane powiadomienia email. Kanal calkowicie usuniety z kodu i konfiguracji.
 - **Slack** — uzywamy `requests.post()` zamiast `slack-webhook` (brak timeout i bledna odpowiedz w slack-webhook).
-- **Testy** — `pytest` z `httpx` AsyncClient i `pytest-asyncio`. Konfiguracja w `pytest.ini` (asyncio_mode=auto). Fixtures w `conftest.py` resetuja singleton i ustawiaja testowe env vars.
+- **Testy** — `pytest` z `httpx` AsyncClient i `pytest-asyncio` (27 testow, wszystkie PASSED). Konfiguracja w `pytest.ini` (asyncio_mode=auto). Fixtures w `conftest.py` resetuja singleton i ustawiaja testowe env vars.
 - **README.md** — pochodzi z oryginalnego repo (fabston). Jest przestarzaly — opisuje Flask, Twitter, Python 3.8. Nie odzwierciedla obecnego stanu projektu.

@@ -12,7 +12,7 @@ sprawdz_logowanie()
 WEBHOOK_URL = os.getenv("WEBHOOK_URL", "http://localhost:80")
 SCIEZKA_ENV = ".env"
 
-st.title("Konfiguracja kluczy")
+st.title("🔑 Konfiguracja kluczy")
 st.caption("Edycja wrazliwych danych zapisywanych w pliku .env")
 
 ust = Ustawienia()
@@ -57,7 +57,7 @@ with st.form("formularz_kluczy"):
         type="password",
     )
 
-    zapisz = st.form_submit_button("Zapisz konfiguracje")
+    zapisz = st.form_submit_button("Zapisz konfiguracje", use_container_width=True)
 
 if zapisz:
     if not dashboard_haslo.strip():
@@ -86,6 +86,7 @@ if zapisz:
         st.stop()
 
     st.success("Konfiguracja zapisana do .env")
+    st.toast("✅ Konfiguracja zapisana!")
 
     # Przeladuj config na serwerze webhook (uzywajac STAREGO klucza)
     try:

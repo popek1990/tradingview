@@ -8,7 +8,7 @@ sprawdz_logowanie()
 
 SCIEZKA_LOGOW = "logs/webhook.log"
 
-st.title("Logi serwera")
+st.title("📋 Logi serwera")
 st.caption("Podglad logow serwera webhook")
 
 # Filtry
@@ -20,7 +20,7 @@ with kol2:
 
 ile_linii = st.slider("Liczba ostatnich linii", min_value=50, max_value=1000, value=200, step=50)
 
-if st.button("Odswiez logi"):
+if st.button("Odswiez logi", use_container_width=True):
     st.rerun()
 
 st.markdown("---")

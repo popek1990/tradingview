@@ -12,31 +12,37 @@ sprawdz_logowanie()
 WEBHOOK_URL = os.getenv("WEBHOOK_URL", "http://localhost:80")
 SCIEZKA_ENV = ".env"
 
-st.title("Kanaly powiadomien")
+st.title("📡 Kanaly powiadomien")
 st.caption("Wlaczanie/wylaczanie kanalow i ich ustawienia")
 
 ust = Ustawienia()
 
 with st.form("formularz_kanalow"):
     # --- Telegram ---
-    st.markdown("### Telegram")
+    st.markdown("### 📱 Telegram")
     tg_wl = st.toggle("Wlacz Telegram", value=ust.wyslij_alerty_telegram)
-    kanal = st.text_input("ID kanalu Telegram (domyslny)", value=ust.kanal)
+    kanal = st.text_input("ID grupy Telegram (domyslna)", value=ust.kanal)
+
+    st.markdown("---")
+
+    # --- Telegram — Grupa 2 ---
+    st.markdown("### 📱 Telegram — Grupa 2")
+    st.caption("Opcjonalna druga grupa — alerty beda wysylane na obie grupy jednoczesnie")
+    kanal_2 = st.text_input("ID drugiej grupy Telegram (zostaw puste aby wylaczyc)", value=ust.kanal_2)
 
     st.markdown("---")
 
     # --- Discord ---
-    st.markdown("### Discord")
+    st.markdown("### 💬 Discord")
     dc_wl = st.toggle("Wlacz Discord", value=ust.wyslij_alerty_discord)
 
     st.markdown("---")
 
     # --- Slack ---
-    st.markdown("### Slack")
+    st.markdown("### 🔔 Slack")
     sl_wl = st.toggle("Wlacz Slack", value=ust.wyslij_alerty_slack)
 
-
-    zapisz = st.form_submit_button("Zapisz ustawienia kanalow")
+    zapisz = st.form_submit_button("Zapisz ustawienia kanalow", use_container_width=True)
 
 if zapisz:
     stary_sec_key = ust.sec_key
@@ -44,6 +50,7 @@ if zapisz:
     pola = {
         "WYSLIJ_ALERTY_TELEGRAM": str(tg_wl),
         "KANAL": kanal,
+        "KANAL_2": kanal_2,
         "WYSLIJ_ALERTY_DISCORD": str(dc_wl),
         "WYSLIJ_ALERTY_SLACK": str(sl_wl),
     }
@@ -59,6 +66,7 @@ if zapisz:
         st.stop()
 
     st.success("Ustawienia kanalow zapisane do .env")
+    st.toast("✅ Kanaly zapisane!")
 
     try:
         resp = requests.post(
