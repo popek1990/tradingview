@@ -21,7 +21,8 @@ s_key = "🟢" if ust.sec_key else "🔴"
 s_tg = "🟢" if ust.wyslij_alerty_telegram and ust.tg_token else "🔴"
 s_tg2 = ""
 if ust.kanal_2:
-    s_tg2 = f' | <span title="Grupa 2: {ust.kanal_2}" style="cursor:help;">🟢 Telegram 2</span>'
+    tg2_kolor = "🟢" if ust.wyslij_alerty_telegram_2 else "🔴"
+    s_tg2 = f' | <span title="Grupa 2: {ust.kanal_2}" style="cursor:help;">{tg2_kolor} Telegram 2</span>'
 s_dc = "🟢" if ust.wyslij_alerty_discord and ust.discord_webhook else "🔴"
 s_sl = "🟢" if ust.wyslij_alerty_slack and ust.slack_webhook else "🔴"
 
@@ -44,12 +45,12 @@ kol1, kol2 = st.columns(2)
 with kol1:
     st.markdown("### 📡 Status kanalow")
     kanaly = [
-        ("📱 Telegram", ust.wyslij_alerty_telegram),
+        ("📱 Telegram / Grupa 1", ust.wyslij_alerty_telegram),
         ("💬 Discord", ust.wyslij_alerty_discord),
         ("🔔 Slack", ust.wyslij_alerty_slack),
     ]
     if ust.kanal_2:
-        kanaly.insert(1, ("📱 Telegram 2", ust.wyslij_alerty_telegram))
+        kanaly.insert(1, ("📱 Telegram / Grupa 2", ust.wyslij_alerty_telegram_2))
 
     for nazwa, aktywny in kanaly:
         ikona = "🟢" if aktywny else "🔴"
