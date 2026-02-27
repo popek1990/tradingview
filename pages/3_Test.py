@@ -36,10 +36,26 @@ if wyslij:
         st.error("Brak SEC_KEY w .env — skonfiguruj klucz na stronie Konfiguracja")
         st.stop()
 
-    payload = {
-        "key": ust.sec_key,
-        "msg": msg,
-    }
+    import json
+    
+    # Proba parsowania jako JSON (np. jesli wklejono szablon z TV)
+    msg_to_send = msg
+    try:
+        potential_json = json.loads(msg.strip())
+        if isinstance(potential_json, dict):
+            # To jest JSON - przygotuj payload scalony
+            payload = {
+                "key": ust.sec_key,
+                **potential_json
+            }
+        else:
+            raise ValueError()
+    except Exception:
+        # To nie jest JSON - uzyj starego formatu
+        payload = {
+            "key": ust.sec_key,
+            "msg": msg,
+        }
 
     if telegram_override.strip():
         payload["telegram"] = telegram_override.strip()
