@@ -1,45 +1,62 @@
 # ----------------------------------------------- #
-# Plugin Name           : TradingView-Webhook-Bot #
-# Author Name           : fabston                 #
-# File Name             : config.py               #
+# Nazwa projektu         : TradingView-Webhook-Bot #
+# Plik                   : config.py               #
 # ----------------------------------------------- #
 
-# TradingView Example Alert Message:
-# {
-# "key":"9T2q394M92", "telegram":"-1001298977502", "discord":"789842349670960670/BFeBBrCt-w2Z9RJ2wlH6TWUjM5bJuC29aJaJ5OQv9sE6zCKY_AlOxxFwRURkgEl852s3", "msg":"Long #{{ticker}} at `{{close}}`"
-# }
+import logging
+import threading
 
-sec_key = (
-    ""  # Can be anything. Has to match with "key" in your TradingView alert message
-)
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Telegram Settings
-send_telegram_alerts = False
-tg_token = ""  # Bot token. Get it from @Botfather
-channel = 0  # Channel ID (ex. -1001487568087)
+logger = logging.getLogger(__name__)
 
-# Discord Settings
-send_discord_alerts = False
-discord_webhook = ""  # Discord Webhook URL (https://support.discordapp.com/hc/de/articles/228383668-Webhooks-verwenden)
 
-# Slack Settings
-send_slack_alerts = False
-slack_webhook = ""  # Slack Webhook URL (https://api.slack.com/messaging/webhooks)
+class Ustawienia(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
-# Twitter Settings
-send_twitter_alerts = False
-tw_ckey = ""
-tw_csecret = ""
-tw_atoken = ""
-tw_asecret = ""
+    # Klucz bezpieczenstwa — musi pasowac do "key" w alercie TradingView
+    sec_key: str = ""
 
-# Email Settings
-send_email_alerts = False
-email_sender = ""  # Your email address
-email_receivers = ["", ""]  # Receivers, can be multiple
-email_subject = "Trade Alert!"
+    # Haslo dostepu do panelu Streamlit
+    dashboard_haslo: str = "admin"
 
-email_port = 465  # SMTP SSL Port (ex. 465)
-email_host = ""  # SMTP host (ex. smtp.gmail.com)
-email_user = ""  # SMTP Login credentials
-email_password = ""  # SMTP Login credentials
+    # Ustawienia Telegram
+    wyslij_alerty_telegram: bool = True
+    tg_token: str = ""
+    kanal: str = "-1001929276330"
+
+    # Ustawienia Discord
+    wyslij_alerty_discord: bool = False
+    discord_webhook: str = ""
+
+    # Ustawienia Slack
+    wyslij_alerty_slack: bool = False
+    slack_webhook: str = ""
+
+
+# Singleton z mozliwoscia przeladowania (thread-safe)
+_lock = threading.Lock()
+_ustawienia: Ustawienia | None = None
+
+
+def pobierz_ustawienia() -> Ustawienia:
+    """Zwraca aktualna instancje ustawien (tworzy przy pierwszym wywolaniu)."""
+    global _ustawienia
+    if _ustawienia is None:
+        with _lock:
+            if _ustawienia is None:
+                _ustawienia = Ustawienia()
+    return _ustawienia
+
+
+def przeladuj_ustawienia() -> Ustawienia:
+    """Przeladowuje ustawienia z .env (np. po zmianach w panelu Streamlit)."""
+    global _ustawienia
+    with _lock:
+        _ustawienia = Ustawienia()
+    logger.info("Konfiguracja przeladowana")
+    return _ustawienia

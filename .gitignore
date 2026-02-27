@@ -103,6 +103,10 @@ celerybeat.pid
 
 # Environments
 .env
+
+# Pliki projektu
+plan.md
+backups/
 .venv
 env/
 venv/

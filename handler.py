@@ -1,97 +1,90 @@
 # ----------------------------------------------- #
-# Plugin Name           : TradingView-Webhook-Bot #
-# Author Name           : fabston                 #
-# File Name             : handler.py              #
+# Nazwa projektu         : TradingView-Webhook-Bot #
+# Plik                   : handler.py              #
 # ----------------------------------------------- #
 
-import smtplib
-import ssl
-from email.mime.text import MIMEText
+import logging
+import threading
+from typing import Any
 
-import tweepy
+import requests
 from discord_webhook import DiscordEmbed, DiscordWebhook
-from slack_webhook import Slack
 from telegram import Bot
 
-import config
+from config import pobierz_ustawienia
+
+logger = logging.getLogger(__name__)
+
+TIMEOUT_SIEC = 10  # sekundy — timeout na operacje sieciowe
+
+# Cache bota Telegram (inwalidacja przy zmianie tokena, thread-safe)
+_tg_bot_lock = threading.Lock()
+_tg_bot_cache: tuple[str, Bot] | None = None
 
 
-def send_alert(data):
-    msg = data["msg"].encode("latin-1", "backslashreplace").decode("unicode_escape")
-    if config.send_telegram_alerts:
-        tg_bot = Bot(token=config.tg_token)
+def _pobierz_tg_bot(token: str) -> Bot:
+    """Zwraca cache'owana instancje bota Telegram (tworzy nowa przy zmianie tokena)."""
+    global _tg_bot_cache
+    with _tg_bot_lock:
+        if _tg_bot_cache is None or _tg_bot_cache[0] != token:
+            _tg_bot_cache = (token, Bot(token=token))
+        return _tg_bot_cache[1]
+
+
+def wyslij_alert(data: dict[str, Any]) -> dict[str, bool]:
+    """Wysyla alert do wszystkich wlaczonych kanalow. Zwraca wyniki {kanal: sukces}."""
+    ust = pobierz_ustawienia()
+    msg = data["msg"]
+    wyniki: dict[str, bool] = {}
+
+    if ust.wyslij_alerty_telegram:
         try:
-            tg_bot.sendMessage(
-                data["telegram"],
-                msg,
-                parse_mode="MARKDOWN",
-            )
-        except KeyError:
-            tg_bot.sendMessage(
-                config.channel,
-                msg,
-                parse_mode="MARKDOWN",
-            )
+            tg_bot = _pobierz_tg_bot(ust.tg_token)
+            kanal = data.get("telegram") or ust.kanal
+            tg_bot.sendMessage(kanal, msg, parse_mode="MARKDOWN", timeout=TIMEOUT_SIEC)
+            logger.info("Telegram: wyslano do %s", kanal)
+            wyniki["telegram"] = True
         except Exception as e:
-            print("[X] Telegram Error:\n>", e)
+            logger.error("Telegram: %s", e)
+            wyniki["telegram"] = False
 
-    if config.send_discord_alerts:
+    if ust.wyslij_alerty_discord:
         try:
-            webhook = DiscordWebhook(
-                url="https://discord.com/api/webhooks/" + data["discord"]
-            )
-            embed = DiscordEmbed(title=msg)
+            webhook_id = data.get("discord") or ust.discord_webhook
+            discord_url = webhook_id if webhook_id.startswith("http") else "https://discord.com/api/webhooks/" + webhook_id
+            webhook = DiscordWebhook(url=discord_url, timeout=TIMEOUT_SIEC)
+            if len(msg) > 256:
+                embed = DiscordEmbed(title=msg[:253] + "...", description=msg)
+            else:
+                embed = DiscordEmbed(title=msg)
             webhook.add_embed(embed)
-            webhook.execute()
-        except KeyError:
-            webhook = DiscordWebhook(
-                url="https://discord.com/api/webhooks/" + config.discord_webhook
-            )
-            embed = DiscordEmbed(title=msg)
-            webhook.add_embed(embed)
-            webhook.execute()
+            odpowiedz = webhook.execute()
+            if odpowiedz and hasattr(odpowiedz, "status_code") and odpowiedz.status_code >= 400:
+                logger.error("Discord: serwer zwrocil status %s", odpowiedz.status_code)
+                wyniki["discord"] = False
+            else:
+                logger.info("Discord: wyslano")
+                wyniki["discord"] = True
         except Exception as e:
-            print("[X] Discord Error:\n>", e)
+            logger.error("Discord: %s", e)
+            wyniki["discord"] = False
 
-    if config.send_slack_alerts:
+    if ust.wyslij_alerty_slack:
         try:
-            slack = Slack(url="https://hooks.slack.com/services/" + data["slack"])
-            slack.post(text=msg)
-        except KeyError:
-            slack = Slack(
-                url="https://hooks.slack.com/services/" + config.slack_webhook
-            )
-            slack.post(text=msg)
+            slack_id = data.get("slack") or ust.slack_webhook
+            slack_url = slack_id if slack_id.startswith("http") else "https://hooks.slack.com/services/" + slack_id
+            odpowiedz = requests.post(slack_url, json={"text": msg}, timeout=TIMEOUT_SIEC)
+            if odpowiedz.status_code >= 400:
+                logger.error("Slack: serwer zwrocil status %s", odpowiedz.status_code)
+                wyniki["slack"] = False
+            elif odpowiedz.text != "ok":
+                logger.error("Slack: odpowiedz: %s", odpowiedz.text)
+                wyniki["slack"] = False
+            else:
+                logger.info("Slack: wyslano")
+                wyniki["slack"] = True
         except Exception as e:
-            print("[X] Slack Error:\n>", e)
+            logger.error("Slack: %s", e)
+            wyniki["slack"] = False
 
-    if config.send_twitter_alerts:
-        tw_auth = tweepy.OAuthHandler(config.tw_ckey, config.tw_csecret)
-        tw_auth.set_access_token(config.tw_atoken, config.tw_asecret)
-        tw_api = tweepy.API(tw_auth)
-        try:
-            tw_api.update_status(
-                status=msg.replace("*", "").replace("_", "").replace("`", "")
-            )
-        except Exception as e:
-            print("[X] Twitter Error:\n>", e)
-
-    if config.send_email_alerts:
-        try:
-            email_msg = MIMEText(
-                msg.replace("*", "").replace("_", "").replace("`", "")
-            )
-            email_msg["Subject"] = config.email_subject
-            email_msg["From"] = config.email_sender
-            email_msg["To"] = config.email_sender
-            context = ssl.create_default_context()
-            with smtplib.SMTP_SSL(
-                config.email_host, config.email_port, context=context
-            ) as server:
-                server.login(config.email_user, config.email_password)
-                server.sendmail(
-                    config.email_sender, config.email_receivers, email_msg.as_string()
-                )
-                server.quit()
-        except Exception as e:
-            print("[X] Email Error:\n>", e)
+    return wyniki
