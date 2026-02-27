@@ -1,4 +1,4 @@
-"""Strona logow — podglad logow serwera webhook."""
+"""System Logs — Minimalist Terminal Style."""
 
 import os
 import streamlit as st
@@ -7,26 +7,25 @@ from auth import sprawdz_logowanie
 sprawdz_logowanie()
 
 SCIEZKA_LOGOW = "logs/webhook.log"
-
-st.title("📋 Logi serwera")
-st.caption("Podglad logow serwera webhook")
+st.subheader("📋 SYSTEM OPERATIONAL LOGS")
 
 # Filtry
-kol1, kol2 = st.columns([1, 2])
-with kol1:
-    poziom = st.selectbox("Filtruj poziom", ["Wszystkie", "ERROR", "WARNING", "INFO"])
-with kol2:
-    szukaj = st.text_input("Szukaj w logach")
+with st.container(border=True):
+    kol1, kol2, kol3 = st.columns([1, 2, 1])
+    with kol1:
+        poziom = st.selectbox("LEVEL FILTER", ["ALL", "ERROR", "WARNING", "INFO"])
+    with kol2:
+        szukaj = st.text_input("SEARCH PATTERN")
+    with kol3:
+        ile_linii = st.number_input("LINES TO TAIL", min_value=10, max_value=5000, value=200, step=50)
 
-ile_linii = st.slider("Liczba ostatnich linii", min_value=50, max_value=1000, value=200, step=50)
-
-if st.button("Odswiez logi", use_container_width=True):
+if st.button("REFRESH LOG STREAM", use_container_width=True):
     st.rerun()
 
 st.markdown("---")
 
 if not os.path.exists(SCIEZKA_LOGOW):
-    st.info("Plik logow nie istnieje jeszcze — pojawi sie po pierwszym uruchomieniu serwera webhook.")
+    st.warning("LOG FILE NOT FOUND. Server may not have initialized yet.")
 else:
     try:
         with open(SCIEZKA_LOGOW, encoding="utf-8") as f:
@@ -36,7 +35,7 @@ else:
         linie = linie[-ile_linii:]
 
         # Filtrowanie po poziomie
-        if poziom != "Wszystkie":
+        if poziom != "ALL":
             linie = [l for l in linie if f"[{poziom}]" in l]
 
         # Filtrowanie po tekscie
@@ -45,9 +44,11 @@ else:
             linie = [l for l in linie if szukaj_lower in l.lower()]
 
         if linie:
-            st.text(f"Wyswietlam {len(linie)} linii")
-            st.code("".join(linie), language="log")
+            st.caption(f"STREAMING {len(linie)} LINES...")
+            # Styl terminala
+            log_text = "".join(linie)
+            st.markdown(f'<div class="terminal-log" style="height: 500px; overflow-y: scroll; white-space: pre-wrap; font-size: 12px;">{log_text}</div>', unsafe_allow_html=True)
         else:
-            st.info("Brak logow pasujacych do filtrow")
+            st.info("NO LOGS MATCHING CRITERIA")
     except Exception as e:
-        st.error(f"Blad odczytu logow: {e}")
+        st.error(f"IO ERROR: {e}")

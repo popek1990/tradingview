@@ -1,4 +1,4 @@
-"""Strona kanalow — wlaczanie/wylaczanie kanalow i ustawienia specyficzne."""
+"""Kanaly Powiadomien — Minimalist Terminal Style."""
 
 import os
 import streamlit as st
@@ -12,77 +12,63 @@ sprawdz_logowanie()
 
 WEBHOOK_URL = os.getenv("WEBHOOK_URL", "http://localhost:80")
 SCIEZKA_ENV = ".env"
-
-st.title("📡 Kanaly powiadomien")
-st.caption("Wlaczanie/wylaczanie kanalow i ich ustawienia")
-
 ust = Ustawienia()
+
+st.subheader("📡 NOTIFICATION CHANNELS")
 
 # --- Skanowanie grup Telegram ---
 if "znalezione_grupy" not in st.session_state:
     st.session_state.znalezione_grupy = {}
 
-col_scan, col_info = st.columns([1, 3])
-with col_scan:
-    if st.button("🔄 Skanuj dostępne grupy"):
-        if not ust.tg_token:
-            st.error("Brak tokena Telegram w konfiguracji!")
-        else:
-            try:
-                bot = Bot(token=ust.tg_token)
-                bot_info = bot.get_me()
-                st.info(f"Połączono z: @{bot_info.username}")
-                
-                updates = bot.get_updates(timeout=10, allowed_updates=["message", "channel_post", "my_chat_member"])
-                grupy = {}
-                for u in updates:
-                    chat = None
-                    if u.message:
-                        chat = u.message.chat
-                    elif u.channel_post:
-                        chat = u.channel_post.chat
-                    elif u.my_chat_member:
-                        chat = u.my_chat_member.chat
+with st.expander("🔄 TELEGRAM NETWORK SCANNER", expanded=False):
+    col_scan, col_info = st.columns([1, 2])
+    with col_scan:
+        if st.button("RUN SCAN", use_container_width=True):
+            if not ust.tg_token:
+                st.error("MISSING TG_TOKEN!")
+            else:
+                try:
+                    bot = Bot(token=ust.tg_token)
+                    bot_info = bot.get_me()
+                    st.info(f"CONNECTED: @{bot_info.username}")
                     
-                    if chat and chat.type in ["group", "supergroup", "channel"]:
-                        grupy[str(chat.id)] = chat.title or chat.username or str(chat.id)
-                
-                if not grupy:
-                    st.warning("Nie znaleziono nowych grup.")
-                    st.markdown("""
-                    **Jak sprawić, by bot znalazł grupę?**
-                    1. Dodaj bota do grupy/kanału.
-                    2. Wyślij na grupie wiadomość zaczynającą się od ukośnika, np. `/test @bot_username`.
-                    3. Jeśli to nie działa, nadaj botowi uprawnienia **Administratora** na grupie.
-                    4. Spróbuj kliknąć Skanuj ponownie.
-                    """)
-                else:
-                    st.session_state.znalezione_grupy.update(grupy)
-                    st.success(f"Znaleziono {len(grupy)} grup!")
-            except Exception as e:
-                st.error(f"Błąd podczas skanowania: {e}")
+                    updates = bot.get_updates(timeout=10, allowed_updates=["message", "channel_post", "my_chat_member"])
+                    grupy = {}
+                    for u in updates:
+                        chat = None
+                        if u.message: chat = u.message.chat
+                        elif u.channel_post: chat = u.channel_post.chat
+                        elif u.my_chat_member: chat = u.my_chat_member.chat
+                        
+                        if chat and chat.type in ["group", "supergroup", "channel"]:
+                            grupy[str(chat.id)] = chat.title or chat.username or str(chat.id)
+                    
+                    if not grupy:
+                        st.warning("NO NEW NODES FOUND")
+                    else:
+                        st.session_state.znalezione_grupy.update(grupy)
+                        st.success(f"FOUND {len(grupy)} NODES")
+                except Exception as e:
+                    st.error(f"SCAN ERROR: {e}")
 
-with col_info:
-    if st.session_state.znalezione_grupy:
-        st.info("Wybierz grupę z listy poniżej lub wpisz ID ręcznie.")
-    else:
-        st.caption("Aby grupa pojawiła się na liście, wyślij wiadomość do bota na tej grupie.")
+    with col_info:
+        if st.session_state.znalezione_grupy:
+            st.success(f"LIST READY: {len(st.session_state.znalezione_grupy)} items")
+        else:
+            st.caption("Scan to discover group IDs automatically.")
 
 # Helper do wyboru grupy
 def renderuj_wybor_grupy(label, current_value, key_prefix):
-    opcje = {"Wpisz ręcznie / Inna": None}
-    dla_selectbox = ["Wpisz ręcznie / Inna"]
+    opcje = {"[ MANUAL ENTRY ]": None}
+    dla_selectbox = ["[ MANUAL ENTRY ]"]
     
-    # Budowanie listy opcji
     current_in_list = False
     for gid, gtitle in st.session_state.znalezione_grupy.items():
         label_opt = f"{gtitle} ({gid})"
         opcje[label_opt] = gid
         dla_selectbox.append(label_opt)
-        if str(gid) == str(current_value):
-            current_in_list = True
+        if str(gid) == str(current_value): current_in_list = True
 
-    # Wybor domyslnego indeksu
     index = 0
     if current_in_list:
         for i, opt in enumerate(dla_selectbox):
@@ -90,56 +76,43 @@ def renderuj_wybor_grupy(label, current_value, key_prefix):
                 index = i
                 break
     
-    wybor = st.selectbox(
-        f"Wybierz grupę ({label})", 
-        options=dla_selectbox, 
-        index=index,
-        key=f"{key_prefix}_select"
-    )
+    wybor = st.selectbox(f"{label} Target", options=dla_selectbox, index=index, key=f"{key_prefix}_select")
 
-    final_val = current_value
-    if wybor == "Wpisz ręcznie / Inna":
-        final_val = st.text_input(f"ID grupy {label} (wpisz ręcznie)", value=current_value, key=f"{key_prefix}_input")
+    if wybor == "[ MANUAL ENTRY ]":
+        return st.text_input(f"ID: {label} (Manual)", value=current_value, key=f"{key_prefix}_input")
     else:
-        final_val = opcje[wybor]
-        st.text_input(f"ID grupy {label}", value=final_val, disabled=True, key=f"{key_prefix}_disabled")
-    
-    return final_val
+        val = opcje[wybor]
+        st.text_input(f"ID: {label} (Selected)", value=val, disabled=True, key=f"{key_prefix}_disabled")
+        return val
 
-with st.form("formularz_kanalow"):
-    # --- Telegram — Grupa 1 ---
-    st.markdown("### 📱 Telegram — Grupa 1")
-    tg_wl = st.toggle("Wlacz Telegram / Grupa 1", value=ust.wyslij_alerty_telegram)
+with st.form("form_channels", border=True):
+    col_tg1, col_tg2 = st.columns(2)
     
-    # Wybor grupy 1
-    kanal = renderuj_wybor_grupy("Telegram (domyślna)", ust.kanal, "grp1")
+    with col_tg1:
+        st.markdown("#### 📱 TELEGRAM G1")
+        tg_wl = st.toggle("ENABLE G1", value=ust.wyslij_alerty_telegram)
+        kanal = renderuj_wybor_grupy("G1", ust.kanal, "grp1")
+
+    with col_tg2:
+        st.markdown("#### 📱 TELEGRAM G2")
+        tg_wl_2 = st.toggle("ENABLE G2", value=ust.wyslij_alerty_telegram_2)
+        kanal_2 = renderuj_wybor_grupy("G2", ust.kanal_2, "grp2")
 
     st.markdown("---")
-
-    # --- Telegram — Grupa 2 ---
-    st.markdown("### 📱 Telegram — Grupa 2")
-    tg_wl_2 = st.toggle("Wlacz Telegram / Grupa 2", value=ust.wyslij_alerty_telegram_2)
+    col_dc, col_sl = st.columns(2)
     
-    # Wybor grupy 2
-    kanal_2 = renderuj_wybor_grupy("Telegram (druga)", ust.kanal_2, "grp2")
+    with col_dc:
+        st.markdown("#### 💬 DISCORD")
+        dc_wl = st.toggle("ENABLE DISCORD", value=ust.wyslij_alerty_discord)
 
-    st.markdown("---")
+    with col_sl:
+        st.markdown("#### 🔔 SLACK")
+        sl_wl = st.toggle("ENABLE SLACK", value=ust.wyslij_alerty_slack)
 
-    # --- Discord ---
-    st.markdown("### 💬 Discord")
-    dc_wl = st.toggle("Wlacz Discord", value=ust.wyslij_alerty_discord)
-
-    st.markdown("---")
-
-    # --- Slack ---
-    st.markdown("### 🔔 Slack")
-    sl_wl = st.toggle("Wlacz Slack", value=ust.wyslij_alerty_slack)
-
-    zapisz = st.form_submit_button("Zapisz ustawienia kanalow", use_container_width=True)
+    zapisz = st.form_submit_button("PERSIST CHANNEL SETTINGS", use_container_width=True)
 
 if zapisz:
     stary_sec_key = ust.sec_key
-
     pola = {
         "WYSLIJ_ALERTY_TELEGRAM": str(tg_wl),
         "WYSLIJ_ALERTY_TELEGRAM_2": str(tg_wl_2),
@@ -152,25 +125,20 @@ if zapisz:
     bledy_zapisu = []
     for klucz, wartosc in pola.items():
         sukces, _, _ = set_key(SCIEZKA_ENV, klucz, wartosc)
-        if not sukces:
-            bledy_zapisu.append(klucz)
+        if not sukces: bledy_zapisu.append(klucz)
 
     if bledy_zapisu:
-        st.error(f"Nie udalo sie zapisac: {', '.join(bledy_zapisu)}")
+        st.error(f"WRITE FAILED: {', '.join(bledy_zapisu)}")
         st.stop()
 
-    st.success("Ustawienia kanalow zapisane do .env")
-    st.toast("✅ Kanaly zapisane!")
+    st.success("CHANNELS PERSISTED TO .ENV")
+    st.toast("✅ Persisted!")
 
     try:
-        resp = requests.post(
-            f"{WEBHOOK_URL}/przeladuj-config",
-            json={"key": stary_sec_key},
-            timeout=5,
-        )
+        resp = requests.post(f"{WEBHOOK_URL}/przeladuj-config", json={"key": stary_sec_key}, timeout=5)
         if resp.status_code == 200:
-            st.success("Serwer webhook przeladowal konfiguracje")
+            st.success("WEBHOOK SERVER: CONFIG RELOADED")
         else:
-            st.warning(f"Serwer webhook zwrocil status {resp.status_code}")
+            st.warning(f"WEBHOOK SERVER: RELOAD FAILED (HTTP {resp.status_code})")
     except Exception:
-        st.info("Nie udalo sie polaczyc z serwerem webhook — przeladuj recznie lub zrestartuj kontener")
+        st.info("WEBHOOK SERVER: UNREACHABLE")
