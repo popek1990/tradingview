@@ -3,11 +3,13 @@ services:
     build: .
     container_name: TradingView-Webhook
     ports:
-      - "127.0.0.1:80:1990"  # Tylko localhost — cloudflared laczy sie lokalnie
+      - "127.0.0.1:80:1990"  # Localhost only — cloudflared connects locally
     volumes:
-      - ./.env:/usr/src/app/.env
-      - ./szablony.json:/usr/src/app/szablony.json
-      - logi:/usr/src/app/logs
+      - ./.env:/usr/src/app/.env:ro  # Read-only for webhook (doesn't write to .env)
+      - ./templates.json:/usr/src/app/templates.json:ro
+      - logs:/usr/src/app/logs
+    security_opt:
+      - no-new-privileges:true
     deploy:
       resources:
         limits:
@@ -21,13 +23,15 @@ services:
       dockerfile: Dockerfile.streamlit
     container_name: TradingView-Dashboard
     ports:
-      - "0.0.0.0:8501:8501"  # Dostepny w sieci lokalnej — chroniony haslem (DASHBOARD_HASLO)
+      - "0.0.0.0:8501:8501"  # Available on LAN — protected by password (DASHBOARD_PASSWORD)
     environment:
-      - WEBHOOK_URL=http://webhook:1990
+      - WEBHOOK_URL=http://TradingView-Webhook:1990
     volumes:
       - ./.env:/usr/src/app/.env
-      - ./szablony.json:/usr/src/app/szablony.json
-      - logi:/usr/src/app/logs
+      - ./templates.json:/usr/src/app/templates.json
+      - logs:/usr/src/app/logs
+    security_opt:
+      - no-new-privileges:true
     deploy:
       resources:
         limits:
@@ -38,4 +42,4 @@ services:
       - webhook
 
 volumes:
-  logi:
+  logs:

@@ -106,7 +106,12 @@ celerybeat.pid
 
 # Pliki projektu
 plan.md
+AUDIT_REPORT.md
+CLAUDE.md
+GEMINI.md
 backups/
+do_usuniecia/
+pomocne/
 .venv
 env/
 venv/

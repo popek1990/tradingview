@@ -1,42 +1,42 @@
-"""Wspoldzielone fixtures dla testow."""
+"""Shared test fixtures."""
 
 import os
 import pytest
 
-# Ustawienia testowe — nadpisujemy zmienne srodowiskowe PRZED importem modulow
+# Test settings — override env vars BEFORE importing modules
 TEST_ENV = {
     "SEC_KEY": "test_secret_key_123",
-    "DASHBOARD_HASLO": "test_haslo",
+    "DASHBOARD_PASSWORD": "test_password",
     "TG_TOKEN": "fake_tg_token",
-    "KANAL": "-100123456",
-    "WYSLIJ_ALERTY_TELEGRAM": "False",
-    "WYSLIJ_ALERTY_DISCORD": "False",
-    "WYSLIJ_ALERTY_SLACK": "False",
-    "KANAL_2": "",
+    "CHANNEL": "-100123456",
+    "SEND_ALERTS_TELEGRAM": "False",
+    "SEND_ALERTS_DISCORD": "False",
+    "SEND_ALERTS_SLACK": "False",
+    "CHANNEL_2": "",
     "DISCORD_WEBHOOK": "",
     "SLACK_WEBHOOK": "",
 }
 
 
 @pytest.fixture(autouse=True)
-def _wyczysc_singleton():
-    """Resetuje singleton ustawien przed kazdym testem."""
+def _clear_singleton():
+    """Resets settings singleton before each test."""
     import config
-    config._ustawienia = None
+    config._settings = None
     yield
-    config._ustawienia = None
+    config._settings = None
 
 
 @pytest.fixture(autouse=True)
-def _env_testowy(monkeypatch, tmp_path):
-    """Ustawia zmienne srodowiskowe testowe i tworzy tymczasowy .env."""
-    for klucz, wartosc in TEST_ENV.items():
-        monkeypatch.setenv(klucz, wartosc)
+def _test_env(monkeypatch, tmp_path):
+    """Sets test env vars and creates temporary .env file."""
+    for key, value in TEST_ENV.items():
+        monkeypatch.setenv(key, value)
 
-    # Tymczasowy .env (pydantic-settings czyta z env vars, nie z pliku w testach)
-    env_plik = tmp_path / ".env"
-    env_plik.write_text("")
+    # Temporary .env (pydantic-settings reads from env vars, not file in tests)
+    env_file = tmp_path / ".env"
+    env_file.write_text("")
     monkeypatch.chdir(tmp_path)
 
-    # Katalog logs dla RotatingFileHandler
+    # Logs directory for RotatingFileHandler
     (tmp_path / "logs").mkdir(exist_ok=True)

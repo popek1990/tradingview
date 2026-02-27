@@ -6,11 +6,13 @@ WORKDIR /usr/src/app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY main.py handler.py config.py szablony.py ./
+COPY main.py handler.py config.py templates.py ./
 
-RUN mkdir -p /usr/src/app/logs
-# Usunieto USER appuser, aby uniknac problemow z uprawnieniami do pliku .env (PermissionError)
-# Oba kontenery (webhook i dashboard) beda teraz dzialac jako root, co pozwala na wspoldzielenie i edycje .env.
+# Non-root user (principle of least privilege)
+RUN groupadd -g 1000 appgrp && useradd -u 1000 -g appgrp appuser \
+    && mkdir -p /usr/src/app/logs \
+    && chown -R appuser:appgrp /usr/src/app/logs
+USER appuser
 
 EXPOSE 1990
 

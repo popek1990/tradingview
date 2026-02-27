@@ -1,13 +1,12 @@
 [server]
-# Wylacz XSRF — powoduje utrate sesji za reverse proxy (Cloudflare Tunnel)
-enableXsrfProtection = false
-# Wylacz CORS — Cloudflare Tunnel zmienia origin
-enableCORS = false
-# Headless mode (Docker, brak przegladarki)
+# XSRF and CORS enabled (security)
+enableXsrfProtection = true
+enableCORS = true
+# Headless mode (Docker, no browser)
 headless = true
 
 [browser]
-# Nie zbieraj statystyk
+# Don't collect usage stats
 gatherUsageStats = false
 
 [theme]

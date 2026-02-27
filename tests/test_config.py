@@ -1,49 +1,48 @@
-"""Testy modulu konfiguracji."""
+"""Tests for configuration module."""
 
 import os
 import pytest
-from config import Ustawienia, pobierz_ustawienia, przeladuj_ustawienia
+from config import Settings, get_settings, reload_settings
 
 
-class TestUstawienia:
-    def test_domyslne_wartosci(self, monkeypatch):
-        """Domyslne wartosci sa poprawne."""
-        # Usuwamy env vars zeby sprawdzic domyslne
+class TestSettings:
+    def test_default_values(self, monkeypatch):
+        """Default values are correct."""
         for key in list(os.environ):
-            if key in ("WYSLIJ_ALERTY_TELEGRAM", "WYSLIJ_ALERTY_DISCORD", "DASHBOARD_HASLO"):
+            if key in ("SEND_ALERTS_TELEGRAM", "SEND_ALERTS_DISCORD", "DASHBOARD_PASSWORD"):
                 monkeypatch.delenv(key)
-        ust = Ustawienia()
-        assert ust.wyslij_alerty_discord is False
-        assert ust.dashboard_haslo == "admin"
+        settings = Settings()
+        assert settings.send_alerts_discord is False
+        assert settings.dashboard_password == ""
 
-    def test_laduje_z_env(self):
-        """Wartosci z env vars sa ladowane."""
-        ust = Ustawienia()
-        assert ust.sec_key == "test_secret_key_123"
-        assert ust.dashboard_haslo == "test_haslo"
+    def test_loads_from_env(self):
+        """Values from env vars are loaded."""
+        settings = Settings()
+        assert settings.sec_key == "test_secret_key_123"
+        assert settings.dashboard_password == "test_password"
 
-    def test_bool_z_env(self, monkeypatch):
-        """Boolean parsowany z roznych formatow."""
-        monkeypatch.setenv("WYSLIJ_ALERTY_TELEGRAM", "True")
-        ust = Ustawienia()
-        assert ust.wyslij_alerty_telegram is True
+    def test_bool_from_env(self, monkeypatch):
+        """Boolean parsed from various formats."""
+        monkeypatch.setenv("SEND_ALERTS_TELEGRAM", "True")
+        settings = Settings()
+        assert settings.send_alerts_telegram is True
 
-        monkeypatch.setenv("WYSLIJ_ALERTY_TELEGRAM", "false")
-        ust2 = Ustawienia()
-        assert ust2.wyslij_alerty_telegram is False
+        monkeypatch.setenv("SEND_ALERTS_TELEGRAM", "false")
+        settings2 = Settings()
+        assert settings2.send_alerts_telegram is False
 
 
 class TestSingleton:
-    def test_pobierz_ustawienia_singleton(self):
-        """Dwa wywolania zwracaja te sama instancje."""
-        ust1 = pobierz_ustawienia()
-        ust2 = pobierz_ustawienia()
-        assert ust1 is ust2
+    def test_get_settings_singleton(self):
+        """Two calls return the same instance."""
+        s1 = get_settings()
+        s2 = get_settings()
+        assert s1 is s2
 
-    def test_przeladuj_ustawienia(self, monkeypatch):
-        """Przeladowanie tworzy nowa instancje."""
-        ust1 = pobierz_ustawienia()
-        monkeypatch.setenv("SEC_KEY", "nowy_klucz")
-        ust2 = przeladuj_ustawienia()
-        assert ust1 is not ust2
-        assert ust2.sec_key == "nowy_klucz"
+    def test_reload_settings(self, monkeypatch):
+        """Reload creates a new instance."""
+        s1 = get_settings()
+        monkeypatch.setenv("SEC_KEY", "new_key_at_least_16")
+        s2 = reload_settings()
+        assert s1 is not s2
+        assert s2.sec_key == "new_key_at_least_16"

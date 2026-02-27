@@ -1,6 +1,6 @@
 # ----------------------------------------------- #
-# Nazwa projektu         : TradingView-Webhook-Bot #
-# Plik                   : config.py               #
+# Project                : TradingView-Webhook-Bot #
+# File                   : config.py               #
 # ----------------------------------------------- #
 
 import logging
@@ -11,62 +11,64 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 logger = logging.getLogger(__name__)
 
 
-class Ustawienia(BaseSettings):
+class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
     )
 
-    # Klucz bezpieczenstwa — musi pasowac do "key" w alercie TradingView
+    # Security key — must match "key" in TradingView alert
     sec_key: str = ""
 
-    # Haslo dostepu do panelu Streamlit (wymagane — brak domyslnego)
-    dashboard_haslo: str = ""
+    # Dashboard access password (required — no default)
+    dashboard_password: str = ""
 
-    # Ustawienia Telegram
-    wyslij_alerty_telegram: bool = True
-    wyslij_alerty_telegram_2: bool = False
+    # Telegram settings
+    send_alerts_telegram: bool = True
+    send_alerts_telegram_2: bool = False
     tg_token: str = ""
-    kanal: str = "-1001929276330"
-    kanal_2: str = ""            # Druga grupa Telegram (opcjonalna)
+    channel: str = "-1001929276330"
+    channel_2: str = ""            # Second Telegram group (optional)
 
-    # Ustawienia Discord
-    wyslij_alerty_discord: bool = False
+    # Discord settings
+    send_alerts_discord: bool = False
     discord_webhook: str = ""
 
-    # Ustawienia Slack
-    wyslij_alerty_slack: bool = False
+    # Slack settings
+    send_alerts_slack: bool = False
     slack_webhook: str = ""
 
 
-# Singleton z mozliwoscia przeladowania (thread-safe)
+# Thread-safe singleton with reload capability
 _lock = threading.Lock()
-_ustawienia: Ustawienia | None = None
+_settings: Settings | None = None
 
 
-def pobierz_ustawienia() -> Ustawienia:
-    """Zwraca aktualna instancje ustawien (tworzy przy pierwszym wywolaniu)."""
-    global _ustawienia
-    if _ustawienia is None:
+def get_settings() -> Settings:
+    """Returns the current settings instance (creates on first call)."""
+    global _settings
+    if _settings is None:
         with _lock:
-            if _ustawienia is None:
+            if _settings is None:
                 try:
-                    _ustawienia = Ustawienia()
+                    _settings = Settings()
                 except Exception as e:
-                    logger.error(f"BLAD krytyczny: Nie udalo sie wczytac konfiguracji: {e}")
-                    # Proba zaladowania bez pliku .env (tylko z os.environ)
-                    _ustawienia = Ustawienia(_env_file=None)
-    return _ustawienia
+                    logger.error("CRITICAL ERROR: Failed to load configuration: %s", e)
+                    try:
+                        _settings = Settings(_env_file=None)
+                    except Exception as e2:
+                        raise RuntimeError(f"Cannot load configuration: {e2}") from e
+    return _settings
 
 
-def przeladuj_ustawienia() -> Ustawienia:
-    """Przeladowuje ustawienia z .env (np. po zmianach w panelu Streamlit)."""
-    global _ustawienia
+def reload_settings() -> Settings:
+    """Reloads settings from .env (e.g. after changes in Streamlit panel)."""
+    global _settings
     with _lock:
         try:
-            _ustawienia = Ustawienia()
-            logger.info("Konfiguracja przeladowana z .env")
+            _settings = Settings()
+            logger.info("Configuration reloaded from .env")
         except Exception as e:
-            logger.warning(f"Problem przy przeladowaniu .env: {e}. Uzywam starych danych.")
-    return _ustawienia
+            logger.warning("Problem reloading .env: %s. Using old data.", e)
+    return _settings

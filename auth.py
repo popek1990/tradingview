@@ -1,113 +1,155 @@
-"""Wspoldzielony modul autoryzacji dla panelu Streamlit."""
+"""Shared authentication module for the Streamlit panel."""
 
 import datetime
-import hashlib
 import hmac
-import time
+import secrets
 
 import extra_streamlit_components as stx
 import streamlit as st
-from config import Ustawienia
+from config import Settings
 from ui_utils import render_ui_header, render_sidebar_info
 
-MAKS_PROB = 5
-BLOKADA_SEKUND = 300  # 5 minut
+MAX_ATTEMPTS = 10
+LOCKOUT_SECONDS = 900  # 15 minutes
 COOKIE_NAME = "tv_bot_session"
+SESSION_TTL_DAYS = 1
 
 
 def get_manager():
-    """Zwraca instancje managera ciasteczek."""
+    """Returns cookie manager instance."""
     return stx.CookieManager()
 
 
 @st.cache_resource
 def get_global_lock():
-    """Globalny licznik nieudanych logowan (wspoldzielony miedzy sesjami)."""
+    """Global failed login counter (shared between sessions)."""
     return {"fail_count": 0, "block_until": 0.0}
 
 
-def hash_token(password: str) -> str:
-    """Tworzy stabilny hash hasla do zapisu w ciasteczku."""
-    return hashlib.sha256(password.encode()).hexdigest()
+@st.cache_resource
+def get_active_sessions():
+    """Server-side storage of active session tokens."""
+    return {}  # {token_hex: expiry_timestamp}
 
 
-def sprawdz_logowanie():
-    """Wymusza logowanie haslem z obsluga ciasteczek i ochrona brute-force."""
-    
-    # Globalne UI i CSS (wspolne dla wszystkich stron)
+def _generate_session_token() -> str:
+    """Generates a random session token (instead of SHA-256 password hash)."""
+    return secrets.token_hex(32)
+
+
+def _save_session(token: str) -> None:
+    """Saves session token server-side with expiration date."""
+    sessions = get_active_sessions()
+    expiry = datetime.datetime.now() + datetime.timedelta(days=SESSION_TTL_DAYS)
+    sessions[token] = expiry.timestamp()
+    # Clean up expired sessions
+    now = datetime.datetime.now().timestamp()
+    expired = [t for t, exp in sessions.items() if exp < now]
+    for t in expired:
+        del sessions[t]
+
+
+def _validate_session(token: str) -> bool:
+    """Checks if session token is active and not expired."""
+    sessions = get_active_sessions()
+    if token not in sessions:
+        return False
+    now = datetime.datetime.now().timestamp()
+    if sessions[token] < now:
+        del sessions[token]
+        return False
+    return True
+
+
+def _invalidate_session(token: str) -> None:
+    """Removes session token (logout)."""
+    sessions = get_active_sessions()
+    sessions.pop(token, None)
+
+
+def check_login():
+    """Enforces password login with cookie handling and brute-force protection."""
+
+    # Global UI and CSS (shared across all pages)
     logout_col = render_ui_header()
     render_sidebar_info()
 
     cookie_manager = get_manager()
     global_lock = get_global_lock()
-    ust = Ustawienia()
+    settings = Settings()
 
-    # Sprawdz czy wlasnie nie wylogowano (force logout flag)
+    # Check if just logged out (force logout flag)
     if st.session_state.get("force_logout", False):
+        # Invalidate session server-side
+        cookies = cookie_manager.get_all()
+        old_token = cookies.get(COOKIE_NAME)
+        if old_token:
+            _invalidate_session(str(old_token))
         cookie_manager.delete(COOKIE_NAME)
         st.session_state["auth_success"] = False
         st.session_state["force_logout"] = False
         st.rerun()
 
-    # Sprawdz ciasteczko
+    # Check cookie
     cookies = cookie_manager.get_all()
     token = cookies.get(COOKIE_NAME)
-    valid_token = hash_token(ust.dashboard_haslo)
 
     is_logged_in = False
-    
-    # Priorytet 1: Sesja tymczasowa (zaraz po wpisaniu hasla)
+
+    # Priority 1: Temporary session (right after entering password)
     if st.session_state.get("auth_success", False):
         is_logged_in = True
-    # Priorytet 2: Ciasteczko (trwale logowanie)
-    elif token and hmac.compare_digest(str(token), valid_token):
+    # Priority 2: Cookie with server-side validation
+    elif token and _validate_session(str(token)):
         is_logged_in = True
 
     if is_logged_in:
         # Logout button inside the header column
         with logout_col:
-            if st.button("🚪 Logout", key="logout_btn"):
+            if st.button("Logout", key="logout_btn"):
                 st.session_state["force_logout"] = True
                 st.session_state["auth_success"] = False
                 cookie_manager.delete(COOKIE_NAME)
                 st.rerun()
         return
 
-    # --- Ekran logowania ---
-    st.title("🔒 Logowanie")
+    # --- Login screen ---
+    st.title("Login")
 
-    # Sprawdz blokade globalna
+    # Check global lockout
+    import time
     now = time.time()
     if global_lock["block_until"] > now:
         wait_s = int(global_lock["block_until"] - now)
-        st.error(f"⚠️ Zbyt wiele nieudanych prob. System zablokowany na {wait_s}s.")
+        st.error(f"Too many failed attempts. System locked for {wait_s}s.")
         st.stop()
 
     with st.form("login_form"):
-        haslo = st.text_input("Haslo dostepu", type="password")
-        submit = st.form_submit_button("Zaloguj")
+        password = st.text_input("Access Password", type="password")
+        submit = st.form_submit_button("Log In")
 
     if submit:
-        if hmac.compare_digest(haslo, ust.dashboard_haslo):
-            # Sukces - reset licznika
+        if hmac.compare_digest(password, settings.dashboard_password):
+            # Success — reset counter
             global_lock["fail_count"] = 0
-            # Ustaw flagę w sesji (natychmiastowy dostęp)
+            # Set session flag (immediate access)
             st.session_state["auth_success"] = True
-            # Ustaw ciasteczko na 30 dni
-            expires = datetime.datetime.now() + datetime.timedelta(days=30)
-            cookie_manager.set(COOKIE_NAME, valid_token, expires_at=expires)
-            st.success("Logowanie...")
-            time.sleep(0.5)
+            # Generate random token and save server-side
+            new_token = _generate_session_token()
+            _save_session(new_token)
+            expires = datetime.datetime.now() + datetime.timedelta(days=SESSION_TTL_DAYS)
+            cookie_manager.set(COOKIE_NAME, new_token, expires_at=expires)
+            st.success("Logging in...")
             st.rerun()
         else:
-            # Porazka - inkrementacja licznika
+            # Failure — increment counter
             global_lock["fail_count"] += 1
-            if global_lock["fail_count"] >= MAKS_PROB:
-                global_lock["block_until"] = time.time() + BLOKADA_SEKUND
+            if global_lock["fail_count"] >= MAX_ATTEMPTS:
+                global_lock["block_until"] = time.time() + LOCKOUT_SECONDS
                 global_lock["fail_count"] = 0
-                st.error(f"⛔ Blokada systemu na {BLOKADA_SEKUND}s!")
+                st.error(f"System locked for {LOCKOUT_SECONDS // 60} minutes!")
             else:
-                prob = MAKS_PROB - global_lock["fail_count"]
-                st.error(f"❌ Bledne haslo. Pozostalo prob: {prob}")
+                remaining = MAX_ATTEMPTS - global_lock["fail_count"]
+                st.error(f"Incorrect password. Attempts remaining: {remaining}")
 
     st.stop()

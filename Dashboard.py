@@ -1,44 +1,44 @@
 """TradingView Webhook Bot — Minimalist Dashboard."""
 
-import os
 import streamlit as st
-from auth import sprawdz_logowanie
-from config import Ustawienia
+from auth import check_login
+from config import Settings
 
 # Dashboard configuration
 st.set_page_config(page_title="TV-BOT TERMINAL", page_icon="📟", layout="wide")
-sprawdz_logowanie()
+check_login()
 
-ust = Ustawienia()
+# Settings loaded after login check
+settings = Settings()
 
 # --- Section 1: CREDENTIALS MATRIX ---
 st.markdown("### 🔑 CREDENTIALS VERIFICATION")
 with st.container(border=True):
     col_l, col_r = st.columns(2)
-    
+
     with col_l:
-        klucze_l = [
-            ("SEC_KEY (Auth Token)", bool(ust.sec_key)),
-            ("TG_TOKEN (Bot API)", bool(ust.tg_token)),
-            ("TG_CHID (Group 1)", bool(ust.kanal)),
+        keys_left = [
+            ("SEC_KEY (Auth Token)", bool(settings.sec_key)),
+            ("TG_TOKEN (Bot API)", bool(settings.tg_token)),
+            ("TG_CHID (Group 1)", bool(settings.channel)),
         ]
-        for nazwa, ok in klucze_l:
+        for label, ok in keys_left:
             status_icon = "✔" if ok else "✖"
             color = "#00FF41" if ok else "#F85149"
-            st.markdown(f"<span style='color: {color}; font-weight: bold;'>{status_icon}</span> {nazwa}", unsafe_allow_html=True)
+            st.markdown(f"<span style='color: {color}; font-weight: bold;'>{status_icon}</span> {label}", unsafe_allow_html=True)
 
     with col_r:
-        klucze_r = [
-            ("DC_URL (Webhook Endpoint)", bool(ust.discord_webhook)),
-            ("SL_URL (Webhook Endpoint)", bool(ust.slack_webhook)),
+        keys_right = [
+            ("DC_URL (Webhook Endpoint)", bool(settings.discord_webhook)),
+            ("SL_URL (Webhook Endpoint)", bool(settings.slack_webhook)),
         ]
-        if ust.kanal_2:
-            klucze_r.insert(0, ("TG_CHID (Group 2)", True))
-            
-        for nazwa, ok in klucze_r:
+        if settings.channel_2:
+            keys_right.insert(0, ("TG_CHID (Group 2)", True))
+
+        for label, ok in keys_right:
             status_icon = "✔" if ok else "✖"
             color = "#00FF41" if ok else "#F85149"
-            st.markdown(f"<span style='color: {color}; font-weight: bold;'>{status_icon}</span> {nazwa}", unsafe_allow_html=True)
+            st.markdown(f"<span style='color: {color}; font-weight: bold;'>{status_icon}</span> {label}", unsafe_allow_html=True)
 
 st.markdown("---")
 st.caption("Dashboard v2.0 | SYSTEM SECURED")
