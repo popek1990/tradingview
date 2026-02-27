@@ -1,4 +1,4 @@
-# CLAUDE.md
+# GEMINI.md
 
 Ten plik zawiera wytyczne dla asystentów AI pracujących z tym repozytorium.
 
@@ -118,6 +118,7 @@ Tradingview/
   requirements.txt         # Zaleznosci (produkcyjne + testowe)
   README.md                # README projektu (po polsku)
   CLAUDE.md                # Instrukcje dla Claude Code
+  GEMINI.md                # Instrukcje dla Gemini
   logs/                    # Logi serwera (tworzony automatycznie, wspoldzielony volume Docker)
 ```
 
