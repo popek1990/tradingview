@@ -1,0 +1,39 @@
+services:
+  webhook:
+    build: .
+    container_name: TradingView-Webhook
+    ports:
+      - "80:1990"       # Port 80 wymagany przez TradingView -> 1990 wewnatrz kontenera
+    volumes:
+      - ./.env:/usr/src/app/.env
+      - logi:/usr/src/app/logs
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+    restart: always
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.streamlit
+    container_name: TradingView-Dashboard
+    ports:
+      - "127.0.0.1:8501:8501"  # Tylko localhost — panel nie powinien byc publicznie dostepny
+    environment:
+      - WEBHOOK_URL=http://webhook:1990
+    volumes:
+      - ./.env:/usr/src/app/.env
+      - logi:/usr/src/app/logs
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+    restart: always
+    depends_on:
+      - webhook
+
+volumes:
+  logi:
