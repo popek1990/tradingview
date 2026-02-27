@@ -8,8 +8,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY main.py handler.py config.py szablony.py ./
 
-RUN useradd -m appuser && mkdir -p /usr/src/app/logs && chown appuser:appuser /usr/src/app/logs
-USER appuser
+RUN mkdir -p /usr/src/app/logs
+# Usunieto USER appuser, aby uniknac problemow z uprawnieniami do pliku .env (PermissionError)
+# Oba kontenery (webhook i dashboard) beda teraz dzialac jako root, co pozwala na wspoldzielenie i edycje .env.
 
 EXPOSE 1990
 
