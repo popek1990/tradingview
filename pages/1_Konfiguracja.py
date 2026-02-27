@@ -1,4 +1,4 @@
-"""Strona konfiguracji — edycja kluczy i tokenow w .env."""
+"""Konfiguracja Kluczy — Minimalist Terminal Style."""
 
 import os
 import streamlit as st
@@ -11,62 +11,51 @@ sprawdz_logowanie()
 
 WEBHOOK_URL = os.getenv("WEBHOOK_URL", "http://localhost:80")
 SCIEZKA_ENV = ".env"
-
-st.title("🔑 Konfiguracja kluczy")
-st.caption("Edycja wrazliwych danych zapisywanych w pliku .env")
-
 ust = Ustawienia()
 
-with st.form("formularz_kluczy"):
-    st.markdown("#### Klucz bezpieczenstwa")
+st.subheader("🔑 SECURITY CONFIGURATION")
+
+with st.form("form_keys", border=True):
+    st.markdown("#### ACCESS CONTROL")
     sec_key = st.text_input(
-        "SEC_KEY (musi pasowac do 'key' w alercie TradingView)",
+        "SEC_KEY (Auth key for Webhooks)",
         value=ust.sec_key,
         type="password",
+        help="Musi zgadzać się z kluczem wysyłanym przez TradingView."
+    )
+    dashboard_haslo = st.text_input(
+        "DASHBOARD_HASLO (Panel Access)",
+        value=ust.dashboard_haslo,
+        type="password",
+        help="Hasło do logowania do tego panelu."
     )
 
     st.markdown("---")
-    st.markdown("#### Telegram")
+    st.markdown("#### GATEWAYS & TOKENS")
     tg_token = st.text_input(
-        "TG_TOKEN (token bota z @BotFather)",
+        "TG_TOKEN (Telegram Bot Token)",
         value=ust.tg_token,
         type="password",
     )
-
-    st.markdown("---")
-    st.markdown("#### Discord")
     discord_webhook = st.text_input(
-        "DISCORD_WEBHOOK (ID webhooka, np. 789842.../BFeBBr...)",
+        "DISCORD_WEBHOOK (Webhook ID/Secret)",
         value=ust.discord_webhook,
         type="password",
     )
-
-    st.markdown("---")
-    st.markdown("#### Slack")
     slack_webhook = st.text_input(
-        "SLACK_WEBHOOK (ID webhooka, np. T000/B000/XXXX)",
+        "SLACK_WEBHOOK (Webhook ID)",
         value=ust.slack_webhook,
         type="password",
     )
 
-    st.markdown("---")
-    st.markdown("#### Panel Streamlit")
-    dashboard_haslo = st.text_input(
-        "DASHBOARD_HASLO (haslo dostepu do tego panelu)",
-        value=ust.dashboard_haslo,
-        type="password",
-    )
-
-    zapisz = st.form_submit_button("Zapisz konfiguracje", use_container_width=True)
+    zapisz = st.form_submit_button("SUBMIT CONFIGURATION", use_container_width=True)
 
 if zapisz:
     if not dashboard_haslo.strip():
-        st.error("Haslo panelu nie moze byc puste!")
+        st.error("DASHBOARD_HASLO cannot be empty!")
         st.stop()
 
-    # Zapamietaj stary klucz przed nadpisaniem (potrzebny do przeladowania configa)
     stary_sec_key = ust.sec_key
-
     pola = {
         "SEC_KEY": sec_key,
         "TG_TOKEN": tg_token,
@@ -82,13 +71,12 @@ if zapisz:
             bledy_zapisu.append(klucz)
 
     if bledy_zapisu:
-        st.error(f"Nie udalo sie zapisac: {', '.join(bledy_zapisu)}")
+        st.error(f"FAILED TO WRITE: {', '.join(bledy_zapisu)}")
         st.stop()
 
-    st.success("Konfiguracja zapisana do .env")
-    st.toast("✅ Konfiguracja zapisana!")
+    st.success("CONFIGURATION PERSISTED TO .ENV")
+    st.toast("✅ Persisted!")
 
-    # Przeladuj config na serwerze webhook (uzywajac STAREGO klucza)
     try:
         resp = requests.post(
             f"{WEBHOOK_URL}/przeladuj-config",
@@ -96,8 +84,8 @@ if zapisz:
             timeout=5,
         )
         if resp.status_code == 200:
-            st.success("Serwer webhook przeladowal konfiguracje")
+            st.success("WEBHOOK SERVER: CONFIG RELOADED")
         else:
-            st.warning(f"Serwer webhook zwrocil status {resp.status_code} — moze wymagac restartu")
+            st.warning(f"WEBHOOK SERVER: RELOAD FAILED (HTTP {resp.status_code})")
     except Exception:
-        st.info("Nie udalo sie polaczyc z serwerem webhook — przeladuj recznie lub zrestartuj kontener")
+        st.info("WEBHOOK SERVER: UNREACHABLE (Manual restart required)")

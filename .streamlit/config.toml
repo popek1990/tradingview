@@ -9,3 +9,11 @@ headless = true
 [browser]
 # Nie zbieraj statystyk
 gatherUsageStats = false
+
+[theme]
+base="dark"
+primaryColor="#00FF41"
+backgroundColor="#0D1117"
+secondaryBackgroundColor="#161B22"
+textColor="#C9D1D9"
+font="monospace"

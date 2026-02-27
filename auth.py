@@ -8,6 +8,7 @@ import time
 import extra_streamlit_components as stx
 import streamlit as st
 from config import Ustawienia
+from ui_utils import render_ui_header, render_sidebar_info
 
 MAKS_PROB = 5
 BLOKADA_SEKUND = 300  # 5 minut
@@ -33,13 +34,9 @@ def hash_token(password: str) -> str:
 def sprawdz_logowanie():
     """Wymusza logowanie haslem z obsluga ciasteczek i ochrona brute-force."""
     
-    # Ukryj elementy interfejsu Streamlit
-    st.markdown("""
-        <style>
-        .stDeployButton {display:none;}
-        footer {visibility: hidden;}
-        </style>
-    """, unsafe_allow_html=True)
+    # Globalne UI i CSS (wspolne dla wszystkich stron)
+    render_ui_header()
+    render_sidebar_info()
 
     cookie_manager = get_manager()
     global_lock = get_global_lock()
