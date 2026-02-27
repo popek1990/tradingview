@@ -19,8 +19,9 @@ TradingView-Webhook-Bot — serwer webhook (FastAPI) odbierajacy alerty z Tradin
 # Docker (zalecane) — produkcja
 docker compose build
 docker compose up -d
-# -> webhook: http://HOST:80/webhook (port 80 wymagany przez TradingView)
-# -> panel:   http://localhost:8501 (tylko localhost)
+# -> webhook: https://tv.popeklab.com/webhook (przez Cloudflare Tunnel)
+# -> panel:   https://panel.popeklab.com (przez Cloudflare Tunnel)
+# -> panel LAN: http://IP_SERWERA:8501
 
 # Lokalnie — webhook
 pip install -r requirements.txt
@@ -209,8 +210,8 @@ Klasa `Ustawienia(BaseSettings)` z pydantic-settings — **jedno zrodlo prawdy**
 ### Docker
 
 - **Dockerfile** — `python:3.12-slim`, non-root user (`appuser`), katalog `logs` z uprawnieniami appuser, EXPOSE 1990, HEALTHCHECK na `/health`, graceful shutdown (`--timeout-graceful-shutdown 10`), `.env` NIE kopiowany (montowany jako volume)
-- **Dockerfile.streamlit** — osobny obraz, non-root user (`appuser`), port 8501, HEALTHCHECK na `/_stcore/health`
-- **docker-compose.yml** — serwis `webhook` (127.0.0.1:80->1990, 256M RAM, 0.5 CPU) + serwis `dashboard` (127.0.0.1:8501, 512M RAM, 0.5 CPU), wspoldzielony `.env`, `szablony.json` i `logi` (named volume) przez volume mount. Port 80 tylko localhost — ruch z internetu przez Cloudflare Tunnel. Limity zasobow przez `deploy.resources.limits`.
+- **Dockerfile.streamlit** — osobny obraz, root user (potrzebny do zapisu szablony.json z bind mount), port 8501, HEALTHCHECK na `/_stcore/health`
+- **docker-compose.yml** — serwis `webhook` (127.0.0.1:80->1990, 256M RAM, 0.5 CPU) + serwis `dashboard` (0.0.0.0:8501, 512M RAM, 0.5 CPU), wspoldzielony `.env`, `szablony.json` i `logi` (named volume) przez volume mount. Port 80 tylko localhost — ruch z internetu przez Cloudflare Tunnel. Dashboard dostepny z LAN i przez Cloudflare Tunnel (`panel.popeklab.com`). Limity zasobow przez `deploy.resources.limits`.
 
 ### Zmienne w .env
 
@@ -221,8 +222,9 @@ Opcjonalne nadpisania: `WYSLIJ_ALERTY_TELEGRAM`, `WYSLIJ_ALERTY_TELEGRAM_2`, `WY
 ## Wazne uwagi
 
 - **`.env` NIGDY nie trafia do repo ani do obrazu Docker** — jest w `.gitignore`. Nie commitowac, nie pushowac. Zawiera tokeny, hasla i klucze API. W Docker montowany jako volume.
-- **Dashboard tylko localhost** — port Streamlit w docker-compose MUSI byc `127.0.0.1:8501:8501`. NIE otwierac na `0.0.0.0` — panel nie powinien byc publicznie dostepny z internetu.
-- **Port 80** mapowany na `127.0.0.1:80` — dostep z internetu przez Cloudflare Tunnel (cloudflared na hoscie Proxmox). Nie otwierac na `0.0.0.0`.
+- **Dashboard** — port 8501 otwarty na `0.0.0.0` (dostep z LAN). Dostepny tez przez Cloudflare Tunnel jako `https://panel.popeklab.com`. Chroniony haslem (`DASHBOARD_HASLO`) + bruteforce protection + auto-wylogowanie 30 min.
+- **Port 80** mapowany na `127.0.0.1:80` — dostep z internetu przez Cloudflare Tunnel (`https://tv.popeklab.com`). Nie otwierac na `0.0.0.0`.
+- **Cloudflare Tunnel** — `cloudflared` na hoscie Proxmox. Dwa public hostnames: `tv.popeklab.com` → `localhost:80` (webhook), `panel.popeklab.com` → `localhost:8501` (dashboard). Domena: `popeklab.com` (Cloudflare Registrar, WHOIS ukryty). Zero otwartych portow na zewnatrz, IP serwera ukryte.
 - `python-telegram-bot==13.6` (sync API) — wywolywane przez `asyncio.to_thread()`. Wymaga `urllib3<2`. Upgrade do 20+ wymagalby przepisania na async.
 - **Slack** — uzywamy `requests.post()` zamiast `slack-webhook` (brak timeout i bledna odpowiedz w slack-webhook).
 - **Testy** — `pytest` z `httpx` AsyncClient i `pytest-asyncio` (38 testow, wszystkie PASSED). Konfiguracja w `pytest.ini` (asyncio_mode=auto). Fixtures w `conftest.py` resetuja singleton i ustawiaja testowe env vars.
