@@ -4,6 +4,9 @@ import streamlit as st
 from auth import sprawdz_logowanie
 from szablony import wczytaj_szablony, zapisz_szablony
 
+# Must be first Streamlit command
+st.set_page_config(page_title="TV-BOT | TEMPLATES", page_icon="📝", layout="wide")
+
 sprawdz_logowanie()
 
 st.subheader("📝 PAYLOAD TEMPLATES")

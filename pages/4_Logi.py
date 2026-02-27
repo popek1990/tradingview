@@ -4,6 +4,9 @@ import os
 import streamlit as st
 from auth import sprawdz_logowanie
 
+# Must be first Streamlit command
+st.set_page_config(page_title="TV-BOT | LOGS", page_icon="📋", layout="wide")
+
 sprawdz_logowanie()
 
 SCIEZKA_LOGOW = "logs/webhook.log"
