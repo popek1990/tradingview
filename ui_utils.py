@@ -118,10 +118,10 @@ def render_ui_header():
 
         st.markdown(f"""
             <div style="font-size: 13px; opacity: 0.9; margin-top: 5px; margin-bottom: 10px;">
+                <span title="{t_srv}" class="status-dot">{s_srv} Webhook Server</span> |
                 <span title="{t_tg}" class="status-dot">{s_tg} Telegram</span> |
                 <span title="{t_dc}" class="status-dot">{s_dc} Discord</span> |
-                <span title="{t_sl}" class="status-dot">{s_sl} Slack</span> |
-                <span title="{t_srv}" class="status-dot">{s_srv} Webhook Server</span>
+                <span title="{t_sl}" class="status-dot">{s_sl} Slack</span>
             </div>
         """, unsafe_allow_html=True)
     st.markdown("---")
