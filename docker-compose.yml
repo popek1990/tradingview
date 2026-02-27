@@ -21,7 +21,7 @@ services:
       dockerfile: Dockerfile.streamlit
     container_name: TradingView-Dashboard
     ports:
-      - "127.0.0.1:8501:8501"  # Tylko localhost — panel nie powinien byc publicznie dostepny
+      - "0.0.0.0:8501:8501"  # Dostepny w sieci lokalnej — chroniony haslem (DASHBOARD_HASLO)
     environment:
       - WEBHOOK_URL=http://webhook:1990
     volumes:
