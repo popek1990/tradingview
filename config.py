@@ -51,7 +51,12 @@ def pobierz_ustawienia() -> Ustawienia:
     if _ustawienia is None:
         with _lock:
             if _ustawienia is None:
-                _ustawienia = Ustawienia()
+                try:
+                    _ustawienia = Ustawienia()
+                except Exception as e:
+                    logger.error(f"BLAD krytyczny: Nie udalo sie wczytac konfiguracji: {e}")
+                    # Proba zaladowania bez pliku .env (tylko z os.environ)
+                    _ustawienia = Ustawienia(_env_file=None)
     return _ustawienia
 
 
@@ -59,6 +64,9 @@ def przeladuj_ustawienia() -> Ustawienia:
     """Przeladowuje ustawienia z .env (np. po zmianach w panelu Streamlit)."""
     global _ustawienia
     with _lock:
-        _ustawienia = Ustawienia()
-    logger.info("Konfiguracja przeladowana")
+        try:
+            _ustawienia = Ustawienia()
+            logger.info("Konfiguracja przeladowana z .env")
+        except Exception as e:
+            logger.warning(f"Problem przy przeladowaniu .env: {e}. Uzywam starych danych.")
     return _ustawienia
