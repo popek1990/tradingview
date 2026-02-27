@@ -92,16 +92,14 @@ tradingview/
     test_handler.py        # Testy handlera z mockowanymi kanalami
   .env                     # Wrazliwe dane (tokeny, hasla) — w .gitignore, NIE w repo
   .gitignore               # Ignorowane pliki (venv, __pycache__, .env, plan.md, backups)
-  .dockerignore            # Wykluczone z obrazu Docker (git, venv, backups, assets, *.md)
+  .dockerignore            # Wykluczone z obrazu Docker (git, venv, backups, *.md)
   Dockerfile               # Obraz webhook (python:3.12-slim, port 1990)
   Dockerfile.streamlit     # Obraz panelu Streamlit (port 8501)
   docker-compose.yml       # Dwa serwisy: webhook + dashboard + volume logow
   pytest.ini               # Konfiguracja pytest (asyncio_mode=auto)
   requirements.txt         # Zaleznosci (produkcyjne + testowe)
-  LICENSE                  # MIT
-  README.md                # Oryginalny README (PRZESTARZALY — opisuje Flask, Twitter, Python 3.8)
+  README.md                # README projektu (po polsku)
   logs/                    # Logi serwera (tworzony automatycznie, wspoldzielony volume Docker)
-  assets/                  # Logo projektu (z oryginalnego repo)
 ```
 
 ## Architektura i logika
@@ -186,6 +184,6 @@ Opcjonalne nadpisania: `WYSLIJ_ALERTY_TELEGRAM`, `WYSLIJ_ALERTY_DISCORD`, `WYSLI
 - **Email usuniety** — TradingView ma wbudowane powiadomienia email. Kanal calkowicie usuniety z kodu i konfiguracji.
 - **Slack** — uzywamy `requests.post()` zamiast `slack-webhook` (brak timeout i bledna odpowiedz w slack-webhook).
 - **Testy** — `pytest` z `httpx` AsyncClient i `pytest-asyncio` (27 testow, wszystkie PASSED). Konfiguracja w `pytest.ini` (asyncio_mode=auto). Fixtures w `conftest.py` resetuja singleton i ustawiaja testowe env vars.
-- **README.md** — pochodzi z oryginalnego repo (fabston). Jest przestarzaly — opisuje Flask, Twitter, Python 3.8. Nie odzwierciedla obecnego stanu projektu.
+- **README.md** — po polsku, opisuje aktualny stan projektu.
 - **`.env` NIGDY nie trafia do repo** — jest w `.gitignore`. Nie commitowac, nie pushowac. Zawiera tokeny, hasla i klucze API.
 - **Dashboard tylko localhost** — port Streamlit w docker-compose MUSI byc `127.0.0.1:8501:8501`. NIE otwierac na `0.0.0.0` — panel nie powinien byc publicznie dostepny z internetu.

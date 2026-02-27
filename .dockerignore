@@ -7,6 +7,3 @@ backups
 .dockerignore
 .gitignore
 *.md
-LICENSE
-assets
-.github
