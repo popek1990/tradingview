@@ -41,7 +41,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Rate limiting
-limiter = Limiter(key_func=get_remote_address)
+# slowapi/starlette probuje czytac .env domyslnie, co powoduje PermissionError w Dockerze.
+# Ustawiamy config=None, aby temu zapobiec.
+limiter = Limiter(key_func=get_remote_address, default_limits=["30/minute"], config_filename=None)
 
 # Konfiguracja pydantic-settings, aby NIE czytal .env automatycznie w slowapi/starlette
 # (Robimy to recznie w config.py przez BaseSettings)
