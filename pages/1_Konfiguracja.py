@@ -7,6 +7,9 @@ from dotenv import set_key
 from auth import sprawdz_logowanie
 from config import Ustawienia
 
+# Must be first Streamlit command
+st.set_page_config(page_title="TV-BOT | CONFIG", page_icon="🔑", layout="wide")
+
 sprawdz_logowanie()
 
 WEBHOOK_URL = os.getenv("WEBHOOK_URL", "http://localhost:80")

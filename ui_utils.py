@@ -30,7 +30,17 @@ def render_ui_header():
     # Globalny CSS Matrix/Minimalist
     st.markdown("""
         <style>
-        .stApp { background-color: #0D1117; color: #C9D1D9; }
+        .stApp { 
+            background-color: #0D1117; 
+            color: #C9D1D9;
+        }
+        
+        /* Medium width constraint */
+        [data-testid="stMainViewContainer"] > div:first-child {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
         html, body, [class*="css"] { font-family: 'Courier New', Courier, monospace !important; }
 
         /* Logout button in top right */
