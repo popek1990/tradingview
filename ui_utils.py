@@ -10,6 +10,7 @@ def check_system_status():
         "tg": bool(ust.tg_token and ust.kanal),
         "dc": bool(ust.discord_webhook),
         "sl": bool(ust.slack_webhook),
+        "key": bool(ust.sec_key),
         "srv": False
     }
     
@@ -109,16 +110,19 @@ def render_ui_header():
         s_tg = "🟢" if stats["tg"] else "🔴"
         s_dc = "🟢" if stats["dc"] else "🔴"
         s_sl = "🟢" if stats["sl"] else "🔴"
+        s_key = "🟢" if stats["key"] else "🔴"
         s_srv = "🟢" if stats["srv"] else "🔴"
 
         t_tg = "Telegram: Connected" if stats["tg"] else "Telegram: Missing Token/Channel"
         t_dc = "Discord: Ready" if stats["dc"] else "Discord: Missing Webhook"
         t_sl = "Slack: Ready" if stats["sl"] else "Slack: Missing Webhook"
+        t_key = "Auth Key: Configured" if stats["key"] else "Auth Key: MISSING SEC_KEY"
         t_srv = "Server: Online" if stats["srv"] else "Server: Offline/Connection Error"
 
         st.markdown(f"""
             <div style="font-size: 13px; opacity: 0.9; margin-top: 5px; margin-bottom: 10px;">
                 <span title="{t_srv}" class="status-dot">{s_srv} Webhook Server</span> |
+                <span title="{t_key}" class="status-dot">{s_key} Auth Key</span> |
                 <span title="{t_tg}" class="status-dot">{s_tg} Telegram</span> |
                 <span title="{t_dc}" class="status-dot">{s_dc} Discord</span> |
                 <span title="{t_sl}" class="status-dot">{s_sl} Slack</span>
