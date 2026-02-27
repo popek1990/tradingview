@@ -30,17 +30,34 @@ with col_scan:
         else:
             try:
                 bot = Bot(token=ust.tg_token)
-                updates = bot.get_updates()
+                bot_info = bot.get_me()
+                st.info(f"Połączono z: @{bot_info.username}")
+                
+                updates = bot.get_updates(timeout=10, allowed_updates=["message", "channel_post", "my_chat_member"])
                 grupy = {}
                 for u in updates:
-                    if u.message and u.message.chat.type in ["group", "supergroup", "channel"]:
+                    chat = None
+                    if u.message:
                         chat = u.message.chat
+                    elif u.channel_post:
+                        chat = u.channel_post.chat
+                    elif u.my_chat_member:
+                        chat = u.my_chat_member.chat
+                    
+                    if chat and chat.type in ["group", "supergroup", "channel"]:
                         grupy[str(chat.id)] = chat.title or chat.username or str(chat.id)
                 
                 if not grupy:
-                    st.warning("Nie znaleziono nowych grup. Wyślij dowolną wiadomość do bota na grupie i spróbuj ponownie.")
+                    st.warning("Nie znaleziono nowych grup.")
+                    st.markdown("""
+                    **Jak sprawić, by bot znalazł grupę?**
+                    1. Dodaj bota do grupy/kanału.
+                    2. Wyślij na grupie wiadomość zaczynającą się od ukośnika, np. `/test @bot_username`.
+                    3. Jeśli to nie działa, nadaj botowi uprawnienia **Administratora** na grupie.
+                    4. Spróbuj kliknąć Skanuj ponownie.
+                    """)
                 else:
-                    st.session_state.znalezione_grupy = grupy
+                    st.session_state.znalezione_grupy.update(grupy)
                     st.success(f"Znaleziono {len(grupy)} grup!")
             except Exception as e:
                 st.error(f"Błąd podczas skanowania: {e}")
