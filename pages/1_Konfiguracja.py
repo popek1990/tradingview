@@ -13,6 +13,7 @@ WEBHOOK_URL = os.getenv("WEBHOOK_URL", "http://localhost:80")
 SCIEZKA_ENV = ".env"
 
 st.title("🔑 Konfiguracja kluczy")
+st.warning("⚠️ OSTRZEŻENIE: Edytujesz plik .env na serwerze. Upewnij się, że połączenie jest szyfrowane (HTTPS), aby nie ujawnić kluczy.", icon="🔒")
 st.caption("Edycja wrazliwych danych zapisywanych w pliku .env")
 
 ust = Ustawienia()

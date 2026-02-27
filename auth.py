@@ -1,70 +1,99 @@
 """Wspoldzielony modul autoryzacji dla panelu Streamlit."""
 
+import datetime
+import hashlib
 import hmac
 import time
 
+import extra_streamlit_components as stx
 import streamlit as st
 from config import Ustawienia
 
 MAKS_PROB = 5
 BLOKADA_SEKUND = 300  # 5 minut
-TIMEOUT_SESJI = 1800  # 30 minut
+COOKIE_NAME = "tv_bot_session"
+
+
+def get_manager():
+    """Zwraca instancje managera ciasteczek."""
+    return stx.CookieManager()
+
+
+@st.cache_resource
+def get_global_lock():
+    """Globalny licznik nieudanych logowan (wspoldzielony miedzy sesjami)."""
+    return {"fail_count": 0, "block_until": 0.0}
+
+
+def hash_token(password: str) -> str:
+    """Tworzy stabilny hash hasla do zapisu w ciasteczku."""
+    return hashlib.sha256(password.encode()).hexdigest()
 
 
 def sprawdz_logowanie():
-    """Wymusza logowanie haslem przed dostepem do strony."""
-    if "zalogowany" not in st.session_state:
-        st.session_state.zalogowany = False
-    if "proby_logowania" not in st.session_state:
-        st.session_state.proby_logowania = 0
-    if "blokada_do" not in st.session_state:
-        st.session_state.blokada_do = 0.0
-    if "ostatnia_aktywnosc" not in st.session_state:
-        st.session_state.ostatnia_aktywnosc = 0.0
+    """Wymusza logowanie haslem z obsluga ciasteczek i ochrona brute-force."""
+    
+    # Ukryj elementy interfejsu Streamlit
+    st.markdown("""
+        <style>
+        .stDeployButton {display:none;}
+        footer {visibility: hidden;}
+        </style>
+    """, unsafe_allow_html=True)
 
-    # Sprawdz timeout sesji
-    if st.session_state.zalogowany:
-        if time.time() - st.session_state.ostatnia_aktywnosc > TIMEOUT_SESJI:
-            st.session_state.zalogowany = False
-            st.toast("Sesja wygasla po 30 minutach nieaktywnosci")
-        else:
-            st.session_state.ostatnia_aktywnosc = time.time()
+    cookie_manager = get_manager()
+    global_lock = get_global_lock()
+    ust = Ustawienia()
 
-    # Przycisk wylogowania w sidebarze
-    if st.session_state.zalogowany:
+    # Sprawdz ciasteczko
+    cookies = cookie_manager.get_all()
+    token = cookies.get(COOKIE_NAME)
+    valid_token = hash_token(ust.dashboard_haslo)
+
+    is_logged_in = False
+    if token and hmac.compare_digest(str(token), valid_token):
+        is_logged_in = True
+
+    if is_logged_in:
         with st.sidebar:
-            if st.button("Wyloguj"):
-                st.session_state.zalogowany = False
-                st.session_state.ostatnia_aktywnosc = 0.0
+            if st.button("Wyloguj", key="logout_btn"):
+                cookie_manager.delete(COOKIE_NAME)
                 st.rerun()
         return
 
-    st.title("Logowanie")
+    # --- Ekran logowania ---
+    st.title("🔒 Logowanie")
 
-    # Sprawdz blokade czasowa
-    if st.session_state.blokada_do > time.time():
-        pozostalo = int(st.session_state.blokada_do - time.time())
-        st.error(f"Zbyt wiele prob. Sprobuj za {pozostalo}s.")
+    # Sprawdz blokade globalna
+    now = time.time()
+    if global_lock["block_until"] > now:
+        wait_s = int(global_lock["block_until"] - now)
+        st.error(f"⚠️ Zbyt wiele nieudanych prob. System zablokowany na {wait_s}s.")
         st.stop()
 
-    # Reset licznika po wygasnieciu blokady
-    if st.session_state.proby_logowania >= MAKS_PROB:
-        st.session_state.proby_logowania = 0
+    with st.form("login_form"):
+        haslo = st.text_input("Haslo dostepu", type="password")
+        submit = st.form_submit_button("Zaloguj")
 
-    haslo = st.text_input("Haslo dostepu", type="password")
-    if st.button("Zaloguj"):
-        ust = Ustawienia()
+    if submit:
         if hmac.compare_digest(haslo, ust.dashboard_haslo):
-            st.session_state.zalogowany = True
-            st.session_state.proby_logowania = 0
-            st.session_state.ostatnia_aktywnosc = time.time()
+            # Sukces - reset licznika
+            global_lock["fail_count"] = 0
+            # Ustaw ciasteczko na 30 dni
+            expires = datetime.datetime.now() + datetime.timedelta(days=30)
+            cookie_manager.set(COOKIE_NAME, valid_token, expires_at=expires)
+            st.success("Logowanie...")
+            time.sleep(0.5)
             st.rerun()
         else:
-            st.session_state.proby_logowania += 1
-            if st.session_state.proby_logowania >= MAKS_PROB:
-                st.session_state.blokada_do = time.time() + BLOKADA_SEKUND
-                st.error(f"Zbyt wiele prob. Blokada na {BLOKADA_SEKUND // 60} minut.")
+            # Porazka - inkrementacja licznika
+            global_lock["fail_count"] += 1
+            if global_lock["fail_count"] >= MAKS_PROB:
+                global_lock["block_until"] = time.time() + BLOKADA_SEKUND
+                global_lock["fail_count"] = 0
+                st.error(f"⛔ Blokada systemu na {BLOKADA_SEKUND}s!")
             else:
-                pozostalo_prob = MAKS_PROB - st.session_state.proby_logowania
-                st.error(f"Nieprawidlowe haslo (pozostalo prob: {pozostalo_prob})")
+                prob = MAKS_PROB - global_lock["fail_count"]
+                st.error(f"❌ Bledne haslo. Pozostalo prob: {prob}")
+
     st.stop()

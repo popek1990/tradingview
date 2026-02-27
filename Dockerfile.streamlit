@@ -8,6 +8,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY streamlit_app.py auth.py config.py szablony.py ./
 COPY pages/ ./pages/
+COPY .streamlit/ ./.streamlit/
 
 EXPOSE 8501
 
