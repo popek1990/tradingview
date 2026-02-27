@@ -1,6 +1,6 @@
 FROM python:3.12-slim
 
-LABEL maintainer="fabston"
+LABEL maintainer="popek1990"
 WORKDIR /usr/src/app
 
 COPY requirements.txt ./

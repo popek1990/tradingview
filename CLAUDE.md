@@ -73,7 +73,7 @@ docker compose build && docker compose up -d
 ## Struktura plikow
 
 ```
-tradingview/
+Tradingview/
   main.py                  # FastAPI — endpointy webhook, health, reload + logging do pliku
   handler.py               # Dispatcher alertow do kanalow (Telegram, Discord, Slack)
   config.py                # Pydantic BaseSettings — konfiguracja (jedno zrodlo prawdy)
@@ -99,6 +99,7 @@ tradingview/
   pytest.ini               # Konfiguracja pytest (asyncio_mode=auto)
   requirements.txt         # Zaleznosci (produkcyjne + testowe)
   README.md                # README projektu (po polsku)
+  CLAUDE.md                # Instrukcje dla Claude Code
   logs/                    # Logi serwera (tworzony automatycznie, wspoldzielony volume Docker)
 ```
 
@@ -177,13 +178,9 @@ Opcjonalne nadpisania: `WYSLIJ_ALERTY_TELEGRAM`, `WYSLIJ_ALERTY_DISCORD`, `WYSLI
 
 ## Wazne uwagi
 
+- **`.env` NIGDY nie trafia do repo ani do obrazu Docker** — jest w `.gitignore`. Nie commitowac, nie pushowac. Zawiera tokeny, hasla i klucze API. W Docker montowany jako volume.
+- **Dashboard tylko localhost** — port Streamlit w docker-compose MUSI byc `127.0.0.1:8501:8501`. NIE otwierac na `0.0.0.0` — panel nie powinien byc publicznie dostepny z internetu.
 - **Port 80** jest wymagany przez TradingView — nie zmieniac mapowania hosta w docker-compose.
-- `.env` nigdy nie jest COPY do obrazu Docker — montowany jako volume. NIE jest w repo (`.gitignore`).
 - `python-telegram-bot==13.6` (sync API) — wywolywane przez `asyncio.to_thread()`. Wymaga `urllib3<2`. Upgrade do 20+ wymagalby przepisania na async.
-- **Twitter/X usuniety** — tweepy API v1.1 nie dziala na darmowym planie. Kanal calkowicie usuniety z kodu i konfiguracji.
-- **Email usuniety** — TradingView ma wbudowane powiadomienia email. Kanal calkowicie usuniety z kodu i konfiguracji.
 - **Slack** — uzywamy `requests.post()` zamiast `slack-webhook` (brak timeout i bledna odpowiedz w slack-webhook).
 - **Testy** — `pytest` z `httpx` AsyncClient i `pytest-asyncio` (27 testow, wszystkie PASSED). Konfiguracja w `pytest.ini` (asyncio_mode=auto). Fixtures w `conftest.py` resetuja singleton i ustawiaja testowe env vars.
-- **README.md** — po polsku, opisuje aktualny stan projektu.
-- **`.env` NIGDY nie trafia do repo** — jest w `.gitignore`. Nie commitowac, nie pushowac. Zawiera tokeny, hasla i klucze API.
-- **Dashboard tylko localhost** — port Streamlit w docker-compose MUSI byc `127.0.0.1:8501:8501`. NIE otwierac na `0.0.0.0` — panel nie powinien byc publicznie dostepny z internetu.
