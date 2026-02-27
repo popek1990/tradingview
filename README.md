@@ -71,4 +71,4 @@ W TradingView ustaw webhook URL na `http://<IP_SERWERA>/webhook` i wiadomosc:
 
 ## Licencja
 
-[MIT](LICENSE)
+MIT
