@@ -43,6 +43,10 @@ logger = logging.getLogger(__name__)
 # Rate limiting
 limiter = Limiter(key_func=get_remote_address)
 
+# Konfiguracja pydantic-settings, aby NIE czytal .env automatycznie w slowapi/starlette
+# (Robimy to recznie w config.py przez BaseSettings)
+os.environ["Pydantic_Settings_Source_File"] = "none"
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
