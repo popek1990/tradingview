@@ -187,3 +187,5 @@ Opcjonalne nadpisania: `WYSLIJ_ALERTY_TELEGRAM`, `WYSLIJ_ALERTY_DISCORD`, `WYSLI
 - **Slack** — uzywamy `requests.post()` zamiast `slack-webhook` (brak timeout i bledna odpowiedz w slack-webhook).
 - **Testy** — `pytest` z `httpx` AsyncClient i `pytest-asyncio` (27 testow, wszystkie PASSED). Konfiguracja w `pytest.ini` (asyncio_mode=auto). Fixtures w `conftest.py` resetuja singleton i ustawiaja testowe env vars.
 - **README.md** — pochodzi z oryginalnego repo (fabston). Jest przestarzaly — opisuje Flask, Twitter, Python 3.8. Nie odzwierciedla obecnego stanu projektu.
+- **`.env` NIGDY nie trafia do repo** — jest w `.gitignore`. Nie commitowac, nie pushowac. Zawiera tokeny, hasla i klucze API.
+- **Dashboard tylko localhost** — port Streamlit w docker-compose MUSI byc `127.0.0.1:8501:8501`. NIE otwierac na `0.0.0.0` — panel nie powinien byc publicznie dostepny z internetu.
