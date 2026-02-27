@@ -4,6 +4,7 @@
 # ----------------------------------------------- #
 
 import logging
+import re
 import threading
 from typing import Any
 
@@ -16,6 +17,7 @@ from config import pobierz_ustawienia
 logger = logging.getLogger(__name__)
 
 TIMEOUT_SIEC = 10  # sekundy — timeout na operacje sieciowe
+REGEX_WEBHOOK_ID = re.compile(r"^[a-zA-Z0-9/_\-]+$")  # Dozwolone znaki w ID webhooka
 
 # Cache bota Telegram (inwalidacja przy zmianie tokena, thread-safe)
 _tg_bot_lock = threading.Lock()
@@ -87,20 +89,26 @@ def wyslij_alert(data: dict[str, Any]) -> dict[str, bool]:
     if ust.wyslij_alerty_discord:
         try:
             webhook_id = data.get("discord") or ust.discord_webhook
-            discord_url = webhook_id if webhook_id.startswith("http") else "https://discord.com/api/webhooks/" + webhook_id
-            webhook = DiscordWebhook(url=discord_url, timeout=TIMEOUT_SIEC)
-            if len(msg) > 256:
-                embed = DiscordEmbed(title=msg[:253] + "...", description=msg)
-            else:
-                embed = DiscordEmbed(title=msg)
-            webhook.add_embed(embed)
-            odpowiedz = webhook.execute()
-            if odpowiedz and hasattr(odpowiedz, "status_code") and odpowiedz.status_code >= 400:
-                logger.error("Discord: serwer zwrocil status %s", odpowiedz.status_code)
+            
+            # Walidacja SSRF
+            if not webhook_id or not REGEX_WEBHOOK_ID.match(webhook_id):
+                logger.warning("Discord: Odrzucono podejrzany ID webhooka: %s", webhook_id)
                 wyniki["discord"] = False
             else:
-                logger.info("Discord: wyslano")
-                wyniki["discord"] = True
+                discord_url = webhook_id if webhook_id.startswith("https://discord.com/api/webhooks/") else "https://discord.com/api/webhooks/" + webhook_id
+                webhook = DiscordWebhook(url=discord_url, timeout=TIMEOUT_SIEC)
+                if len(msg) > 256:
+                    embed = DiscordEmbed(title=msg[:253] + "...", description=msg)
+                else:
+                    embed = DiscordEmbed(title=msg)
+                webhook.add_embed(embed)
+                odpowiedz = webhook.execute()
+                if odpowiedz and hasattr(odpowiedz, "status_code") and odpowiedz.status_code >= 400:
+                    logger.error("Discord: serwer zwrocil status %s", odpowiedz.status_code)
+                    wyniki["discord"] = False
+                else:
+                    logger.info("Discord: wyslano")
+                    wyniki["discord"] = True
         except Exception as e:
             logger.error("Discord: %s", e)
             wyniki["discord"] = False
@@ -108,17 +116,23 @@ def wyslij_alert(data: dict[str, Any]) -> dict[str, bool]:
     if ust.wyslij_alerty_slack:
         try:
             slack_id = data.get("slack") or ust.slack_webhook
-            slack_url = slack_id if slack_id.startswith("http") else "https://hooks.slack.com/services/" + slack_id
-            odpowiedz = requests.post(slack_url, json={"text": msg}, timeout=TIMEOUT_SIEC)
-            if odpowiedz.status_code >= 400:
-                logger.error("Slack: serwer zwrocil status %s", odpowiedz.status_code)
-                wyniki["slack"] = False
-            elif odpowiedz.text != "ok":
-                logger.error("Slack: odpowiedz: %s", odpowiedz.text)
+            
+            # Walidacja SSRF
+            if not slack_id or not REGEX_WEBHOOK_ID.match(slack_id):
+                logger.warning("Slack: Odrzucono podejrzany ID webhooka: %s", slack_id)
                 wyniki["slack"] = False
             else:
-                logger.info("Slack: wyslano")
-                wyniki["slack"] = True
+                slack_url = slack_id if slack_id.startswith("https://hooks.slack.com/services/") else "https://hooks.slack.com/services/" + slack_id
+                odpowiedz = requests.post(slack_url, json={"text": msg}, timeout=TIMEOUT_SIEC)
+                if odpowiedz.status_code >= 400:
+                    logger.error("Slack: serwer zwrocil status %s", odpowiedz.status_code)
+                    wyniki["slack"] = False
+                elif odpowiedz.text != "ok":
+                    logger.error("Slack: odpowiedz: %s", odpowiedz.text)
+                    wyniki["slack"] = False
+                else:
+                    logger.info("Slack: wyslano")
+                    wyniki["slack"] = True
         except Exception as e:
             logger.error("Slack: %s", e)
             wyniki["slack"] = False

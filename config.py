@@ -21,8 +21,8 @@ class Ustawienia(BaseSettings):
     # Klucz bezpieczenstwa — musi pasowac do "key" w alercie TradingView
     sec_key: str = ""
 
-    # Haslo dostepu do panelu Streamlit
-    dashboard_haslo: str = "admin"
+    # Haslo dostepu do panelu Streamlit (wymagane — brak domyslnego)
+    dashboard_haslo: str = ""
 
     # Ustawienia Telegram
     wyslij_alerty_telegram: bool = True

@@ -50,9 +50,8 @@ def renderuj(nazwa: str, zmienne: dict) -> str:
     tresc = szablon["tresc"]
     wymagane = szablon.get("zmienne", [])
 
-    # Podstaw zmienne — brakujace zastap pustym stringiem
-    dane = {k: zmienne.get(k, "") for k in wymagane}
-    try:
-        return tresc.format(**dane)
-    except KeyError as e:
-        raise ValueError(f"Brak zmiennej w szablonie: {e}") from e
+    # Podstaw zmienne — bezpieczny str.replace() zamiast str.format()
+    wynik = tresc
+    for k in wymagane:
+        wynik = wynik.replace(f"{{{k}}}", str(zmienne.get(k, "")))
+    return wynik

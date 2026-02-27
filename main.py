@@ -66,6 +66,8 @@ async def obsluz_rate_limit(request: Request, exc: RateLimitExceeded):
 
 # Model walidacji payloadu (key opcjonalny — moze byc w URL)
 class AlertPayload(BaseModel):
+    model_config = {"extra": "forbid"}  # Odrzucaj nieznane pola
+
     key: str | None = None
     msg: str | None = Field(default=None, max_length=4000)
     szablon: str | None = None

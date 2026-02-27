@@ -17,25 +17,18 @@ ust = Ustawienia()
 st.title("📈 TradingView Webhook Bot")
 
 # Status bar pod tytulem
-s_key = "🟢" if ust.sec_key else "🔴"
-s_tg = "🟢" if ust.wyslij_alerty_telegram and ust.tg_token else "🔴"
-s_tg2 = ""
-if ust.kanal_2:
-    tg2_kolor = "🟢" if ust.wyslij_alerty_telegram_2 else "🔴"
-    s_tg2 = f' | <span title="Grupa 2: {ust.kanal_2}" style="cursor:help;">{tg2_kolor} Telegram 2</span>'
-s_dc = "🟢" if ust.wyslij_alerty_discord and ust.discord_webhook else "🔴"
-s_sl = "🟢" if ust.wyslij_alerty_slack and ust.slack_webhook else "🔴"
+st.markdown("### Status systemu")
+c1, c2, c3, c4 = st.columns(4)
+with c1:
+    st.metric("SEC_KEY", "Skonfigurowany" if ust.sec_key else "Brak", delta="OK" if ust.sec_key else None, delta_color="normal")
+with c2:
+    st.metric("Telegram", "Włączony" if ust.wyslij_alerty_telegram else "Wyłączony", delta=ust.kanal if ust.wyslij_alerty_telegram else None)
+with c3:
+    st.metric("Discord", "Włączony" if ust.wyslij_alerty_discord else "Wyłączony")
+with c4:
+    st.metric("Slack", "Włączony" if ust.wyslij_alerty_slack else "Wyłączony")
 
-st.markdown(f"""
-<div style="font-size: 12px; opacity: 0.9; margin-top: -15px; margin-bottom: 10px;">
-    <span title="Klucz bezpieczenstwa" style="cursor:help;">{s_key} SEC_KEY</span> |
-    <span title="Kanal: {ust.kanal}" style="cursor:help;">{s_tg} Telegram</span>{s_tg2} |
-    <span style="cursor:help;">{s_dc} Discord</span> |
-    <span style="cursor:help;">{s_sl} Slack</span>
-</div>
-""", unsafe_allow_html=True)
-
-st.caption("Panel zarzadzania v1.0")
+st.caption("Panel zarzadzania v1.1 (Secured)")
 
 st.markdown("---")
 
