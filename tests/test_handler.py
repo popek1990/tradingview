@@ -106,8 +106,9 @@ class TestWyslijAlert:
 
     @patch("handler._pobierz_tg_bot")
     def test_telegram_2_wyslano(self, mock_bot, monkeypatch):
-        """Telegram wysyla na dwie grupy gdy kanal_2 ustawiony."""
+        """Telegram wysyla na dwie grupy gdy kanal_2 ustawiony i toggle wlaczony."""
         monkeypatch.setenv("WYSLIJ_ALERTY_TELEGRAM", "True")
+        monkeypatch.setenv("WYSLIJ_ALERTY_TELEGRAM_2", "True")
         monkeypatch.setenv("KANAL_2", "-100druga_grupa")
         mock_instance = MagicMock()
         mock_bot.return_value = mock_instance

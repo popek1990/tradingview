@@ -48,16 +48,16 @@ def wyslij_alert(data: dict[str, Any]) -> dict[str, bool]:
             logger.error("Telegram: %s", e)
             wyniki["telegram"] = False
 
-        # Druga grupa Telegram
-        if ust.kanal_2:
-            try:
-                tg_bot = _pobierz_tg_bot(ust.tg_token)
-                tg_bot.sendMessage(ust.kanal_2, msg, parse_mode="MARKDOWN", timeout=TIMEOUT_SIEC)
-                logger.info("Telegram 2: wyslano do %s", ust.kanal_2)
-                wyniki["telegram_2"] = True
-            except Exception as e:
-                logger.error("Telegram 2: %s", e)
-                wyniki["telegram_2"] = False
+    # Druga grupa Telegram
+    if ust.wyslij_alerty_telegram_2 and ust.kanal_2:
+        try:
+            tg_bot = _pobierz_tg_bot(ust.tg_token)
+            tg_bot.sendMessage(ust.kanal_2, msg, parse_mode="MARKDOWN", timeout=TIMEOUT_SIEC)
+            logger.info("Telegram 2: wyslano do %s", ust.kanal_2)
+            wyniki["telegram_2"] = True
+        except Exception as e:
+            logger.error("Telegram 2: %s", e)
+            wyniki["telegram_2"] = False
 
     if ust.wyslij_alerty_discord:
         try:

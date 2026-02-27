@@ -174,7 +174,7 @@ Klasa `Ustawienia(BaseSettings)` z pydantic-settings — **jedno zrodlo prawdy**
 
 Wrazliwe: `SEC_KEY`, `DASHBOARD_HASLO`, `TG_TOKEN`, `DISCORD_WEBHOOK`, `SLACK_WEBHOOK`
 
-Opcjonalne nadpisania: `WYSLIJ_ALERTY_TELEGRAM`, `WYSLIJ_ALERTY_DISCORD`, `WYSLIJ_ALERTY_SLACK`, `KANAL`
+Opcjonalne nadpisania: `WYSLIJ_ALERTY_TELEGRAM`, `WYSLIJ_ALERTY_TELEGRAM_2`, `WYSLIJ_ALERTY_DISCORD`, `WYSLIJ_ALERTY_SLACK`, `KANAL`
 
 ## Wazne uwagi
 

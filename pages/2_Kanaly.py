@@ -18,16 +18,16 @@ st.caption("Wlaczanie/wylaczanie kanalow i ich ustawienia")
 ust = Ustawienia()
 
 with st.form("formularz_kanalow"):
-    # --- Telegram ---
-    st.markdown("### 📱 Telegram")
-    tg_wl = st.toggle("Wlacz Telegram", value=ust.wyslij_alerty_telegram)
+    # --- Telegram — Grupa 1 ---
+    st.markdown("### 📱 Telegram — Grupa 1")
+    tg_wl = st.toggle("Wlacz Telegram / Grupa 1", value=ust.wyslij_alerty_telegram)
     kanal = st.text_input("ID grupy Telegram (domyslna)", value=ust.kanal)
 
     st.markdown("---")
 
     # --- Telegram — Grupa 2 ---
     st.markdown("### 📱 Telegram — Grupa 2")
-    st.caption("Opcjonalna druga grupa — alerty beda wysylane na obie grupy jednoczesnie")
+    tg_wl_2 = st.toggle("Wlacz Telegram / Grupa 2", value=ust.wyslij_alerty_telegram_2)
     kanal_2 = st.text_input("ID drugiej grupy Telegram (zostaw puste aby wylaczyc)", value=ust.kanal_2)
 
     st.markdown("---")
@@ -49,6 +49,7 @@ if zapisz:
 
     pola = {
         "WYSLIJ_ALERTY_TELEGRAM": str(tg_wl),
+        "WYSLIJ_ALERTY_TELEGRAM_2": str(tg_wl_2),
         "KANAL": kanal,
         "KANAL_2": kanal_2,
         "WYSLIJ_ALERTY_DISCORD": str(dc_wl),

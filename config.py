@@ -26,6 +26,7 @@ class Ustawienia(BaseSettings):
 
     # Ustawienia Telegram
     wyslij_alerty_telegram: bool = True
+    wyslij_alerty_telegram_2: bool = False
     tg_token: str = ""
     kanal: str = "-1001929276330"
     kanal_2: str = ""            # Druga grupa Telegram (opcjonalna)
