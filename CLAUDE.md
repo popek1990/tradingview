@@ -1,6 +1,11 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Ten plik zawiera wytyczne dla asystentów AI pracujących z tym repozytorium.
+
+## Główne Zasady
+
+1. **Język Polski**: Wszystkie odpowiedzi, wyjaśnienia, plany i wiadomości w commitach (commit messages) muszą być w języku **polskim**.
+2. **Docker**: **NIE** wykonuj automatycznie komend `docker build`, `docker compose build` ani `docker compose up`. Aplikacja działa w Dockerze na innej maszynie i użytkownik sam zajmuje się przebudową i restartem kontenerów po wprowadzeniu zmian.
 
 ## Opis projektu
 
@@ -77,6 +82,8 @@ Tradingview/
   main.py                  # FastAPI — endpointy webhook, health, reload + logging do pliku
   handler.py               # Dispatcher alertow do kanalow (Telegram, Discord, Slack)
   config.py                # Pydantic BaseSettings — konfiguracja (jedno zrodlo prawdy)
+  szablony.py              # CRUD i renderowanie szablonow wiadomosci
+  szablony.json            # Plik szablonow (montowany jako Docker volume)
   auth.py                  # Autoryzacja haslem + timeout sesji + wylogowanie
   streamlit_app.py         # Dashboard Streamlit (strona glowna)
   pages/
@@ -84,6 +91,7 @@ Tradingview/
     2_Kanaly.py            # Toggle kanalow + ustawienia kanalu
     3_Test.py              # Reczne wysylanie alertow testowych
     4_Logi.py              # Podglad logow serwera webhook
+    5_Szablony.py          # Zarzadzanie szablonami wiadomosci
   tests/
     __init__.py            # Marker pakietu testow
     conftest.py            # Fixtures testowe (env, singleton reset)
@@ -95,7 +103,7 @@ Tradingview/
   .dockerignore            # Wykluczone z obrazu Docker (git, venv, backups, *.md)
   Dockerfile               # Obraz webhook (python:3.12-slim, port 1990)
   Dockerfile.streamlit     # Obraz panelu Streamlit (port 8501)
-  docker-compose.yml       # Dwa serwisy: webhook + dashboard + volume logow
+  docker-compose.yml       # Dwa serwisy: webhook + dashboard + volume logow + szablony
   pytest.ini               # Konfiguracja pytest (asyncio_mode=auto)
   requirements.txt         # Zaleznosci (produkcyjne + testowe)
   README.md                # README projektu (po polsku)
@@ -111,7 +119,8 @@ Kod spolszczony — nazwy funkcji, zmiennych i komunikaty po polsku.
 
 | Endpoint | Metoda | Opis | Rate limit |
 |---|---|---|---|
-| `/webhook` | POST | Odbiera alerty TradingView | 30/min |
+| `/webhook` | POST | Odbiera alerty TradingView (klucz w JSON body) | 30/min |
+| `/webhook/{klucz}` | POST | Odbiera alerty — klucz w URL, body JSON lub plain text | 30/min |
 | `/health` | GET | Healthcheck + status kanalow | brak |
 | `/przeladuj-config` | POST | Reload configa z .env | 5/min |
 
@@ -119,21 +128,53 @@ Przy starcie serwera (`lifespan` context manager) walidacja krytycznych ustawien
 
 Logi zapisywane do `logs/webhook.log` (RotatingFileHandler, max 5MB, 3 backupy) + stdout.
 
+### Formaty webhooka (3 sposoby uzycia)
+
+**1. Stary format — JSON z kluczem w body (wsteczna kompatybilnosc):**
+```
+POST /webhook
+Body: {"key": "KLUCZ", "msg": "tresc alertu", "telegram?": "...", "discord?": "...", "slack?": "..."}
+```
+
+**2. Nowy format — klucz w URL + plain text (najprostszy):**
+```
+POST /webhook/KLUCZ
+Content-Type: text/plain
+Body: tresc alertu (z Markdown, newliny jako entery)
+```
+
+**3. Nowy format — klucz w URL + szablon:**
+```
+POST /webhook/KLUCZ
+Body: {"szablon": "target", "ticker": "SPX", "exchange": "TVC", "close": "6910"}
+```
+
 ### Przeplyw alertu
 
 ```
 TradingView
-  -> POST /webhook { "key": "...", "msg": "...", "telegram?": "...", "discord?": "...", "slack?": "..." }
-  -> walidacja Pydantic (AlertPayload, max 4000 znakow)
-  -> porownanie klucza: hmac.compare_digest(key, sec_key)
-  -> wyniki = await asyncio.to_thread(wyslij_alert, payload.model_dump(exclude_none=True))
+  -> POST /webhook lub /webhook/{klucz}
+  -> wykrycie Content-Type: application/json vs text/plain
+  -> jesli JSON: walidacja Pydantic (AlertPayload)
+  -> jesli plain text: cale body = wiadomosc (max 4000 zn.)
+  -> klucz: z URL (priorytet) lub z JSON body
+  -> porownanie klucza: hmac.compare_digest(klucz, sec_key)
+  -> jesli szablon: renderuj(nazwa, zmienne) z szablony.json
+  -> wyniki = await asyncio.to_thread(wyslij_alert, dane_alertu)
      -> kazdy wlaczony kanal (Telegram/Discord/Slack)
-        -> data.get("kanal") or domyslna_wartosc_z_configu  # defensywny fallback
-        -> zwraca {kanal: True/False}  # wynik wysylki
+        -> data.get("kanal") or domyslna_wartosc_z_configu
+        -> zwraca {kanal: True/False}
   -> HTTP 200 {"status": "ok", "kanaly": {kanal: sukces}}
   -> HTTP 502 jesli WSZYSTKIE kanaly zawiodly
   -> lub HTTP 400/403/429 przy bledach
 ```
+
+### Szablony wiadomosci (szablony.py)
+
+- `szablony.json` — plik JSON z definicjami szablonow (montowany jako Docker volume)
+- `wczytaj_szablony()` / `zapisz_szablony()` — CRUD operacje (thread-safe z `threading.Lock()`)
+- `renderuj(nazwa, zmienne)` — podstawia zmienne w szablonie (`str.format()`)
+- Zarzadzanie z dashboardu Streamlit (`pages/5_Szablony.py`)
 
 ### Konfiguracja (config.py)
 
@@ -162,13 +203,14 @@ Klasa `Ustawienia(BaseSettings)` z pydantic-settings — **jedno zrodlo prawdy**
 - `pages/2_Kanaly.py` — Toggle kanalow + ustawienia (kanal TG)
 - `pages/3_Test.py` — Reczne wysylanie alertu testowego przez pelny pipeline `/webhook`
 - `pages/4_Logi.py` — Podglad logow serwera: filtrowanie po poziomie (ERROR/WARNING/INFO), wyszukiwanie, konfigurowalny zakres
+- `pages/5_Szablony.py` — Zarzadzanie szablonami wiadomosci: lista, dodawanie, edycja, usuwanie, podglad, generowanie JSON do TradingView
 - Komunikacja ze serwerem: `WEBHOOK_URL` (env var, domyslnie `http://webhook:1990` w Dockerze, `http://localhost:80` lokalnie)
 
 ### Docker
 
 - **Dockerfile** — `python:3.12-slim`, non-root user (`appuser`), katalog `logs` z uprawnieniami appuser, EXPOSE 1990, HEALTHCHECK na `/health`, graceful shutdown (`--timeout-graceful-shutdown 10`), `.env` NIE kopiowany (montowany jako volume)
 - **Dockerfile.streamlit** — osobny obraz, non-root user (`appuser`), port 8501, HEALTHCHECK na `/_stcore/health`
-- **docker-compose.yml** — serwis `webhook` (80->1990, 256M RAM, 0.5 CPU) + serwis `dashboard` (127.0.0.1:8501, 512M RAM, 0.5 CPU), wspoldzielony `.env` i `logi` (named volume) przez volume mount. Limity zasobow przez `deploy.resources.limits`.
+- **docker-compose.yml** — serwis `webhook` (127.0.0.1:80->1990, 256M RAM, 0.5 CPU) + serwis `dashboard` (127.0.0.1:8501, 512M RAM, 0.5 CPU), wspoldzielony `.env`, `szablony.json` i `logi` (named volume) przez volume mount. Port 80 tylko localhost — ruch z internetu przez Cloudflare Tunnel. Limity zasobow przez `deploy.resources.limits`.
 
 ### Zmienne w .env
 
@@ -180,7 +222,8 @@ Opcjonalne nadpisania: `WYSLIJ_ALERTY_TELEGRAM`, `WYSLIJ_ALERTY_TELEGRAM_2`, `WY
 
 - **`.env` NIGDY nie trafia do repo ani do obrazu Docker** — jest w `.gitignore`. Nie commitowac, nie pushowac. Zawiera tokeny, hasla i klucze API. W Docker montowany jako volume.
 - **Dashboard tylko localhost** — port Streamlit w docker-compose MUSI byc `127.0.0.1:8501:8501`. NIE otwierac na `0.0.0.0` — panel nie powinien byc publicznie dostepny z internetu.
-- **Port 80** jest wymagany przez TradingView — nie zmieniac mapowania hosta w docker-compose.
+- **Port 80** mapowany na `127.0.0.1:80` — dostep z internetu przez Cloudflare Tunnel (cloudflared na hoscie Proxmox). Nie otwierac na `0.0.0.0`.
 - `python-telegram-bot==13.6` (sync API) — wywolywane przez `asyncio.to_thread()`. Wymaga `urllib3<2`. Upgrade do 20+ wymagalby przepisania na async.
 - **Slack** — uzywamy `requests.post()` zamiast `slack-webhook` (brak timeout i bledna odpowiedz w slack-webhook).
-- **Testy** — `pytest` z `httpx` AsyncClient i `pytest-asyncio` (27 testow, wszystkie PASSED). Konfiguracja w `pytest.ini` (asyncio_mode=auto). Fixtures w `conftest.py` resetuja singleton i ustawiaja testowe env vars.
+- **Testy** — `pytest` z `httpx` AsyncClient i `pytest-asyncio` (38 testow, wszystkie PASSED). Konfiguracja w `pytest.ini` (asyncio_mode=auto). Fixtures w `conftest.py` resetuja singleton i ustawiaja testowe env vars.
+- **`szablony.json` nie trafia do `.gitignore`** — jest w repo (pusty `{}` jako domyslny). W Docker montowany jako volume.

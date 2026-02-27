@@ -19,6 +19,7 @@ from starlette.responses import JSONResponse
 
 from config import pobierz_ustawienia, przeladuj_ustawienia
 from handler import wyslij_alert
+from szablony import renderuj, wczytaj_szablony
 
 # Logging
 LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
@@ -63,10 +64,11 @@ async def obsluz_rate_limit(request: Request, exc: RateLimitExceeded):
     return JSONResponse(status_code=429, content={"status": "zbyt_wiele_zapytan"})
 
 
-# Model walidacji payloadu
+# Model walidacji payloadu (key opcjonalny — moze byc w URL)
 class AlertPayload(BaseModel):
-    key: str
-    msg: str = Field(max_length=4000)
+    key: str | None = None
+    msg: str | None = Field(default=None, max_length=4000)
+    szablon: str | None = None
     telegram: str | None = None
     discord: str | None = None
     slack: str | None = None
@@ -86,32 +88,89 @@ async def health():
     }
 
 
-@app.post("/webhook")
-@limiter.limit("30/minute")
-async def webhook(request: Request):
-    """Glowny endpoint — odbiera alerty z TradingView."""
-    try:
-        data = await request.json()
-        payload = AlertPayload(**data)
-    except Exception as e:
-        logger.warning("Nieprawidlowy payload: %s", e)
-        raise HTTPException(status_code=400, detail="Nieprawidlowy payload")
+async def _obsluz_webhook(request: Request, klucz_z_url: str | None) -> dict:
+    """Wspolna logika obslugi webhooka — JSON, plain text, szablony."""
+    content_type = request.headers.get("content-type", "")
+
+    szablon: str | None = None
+    dane_json: dict = {}
+    extra: dict = {}
+
+    if "application/json" in content_type:
+        # JSON — stary format (z key) lub nowy (bez key, z szablonem)
+        try:
+            dane_json = await request.json()
+            payload = AlertPayload(**dane_json)
+        except Exception as e:
+            logger.warning("Nieprawidlowy payload: %s", e)
+            raise HTTPException(status_code=400, detail="Nieprawidlowy payload")
+
+        klucz = klucz_z_url or payload.key
+        msg = payload.msg
+        szablon = payload.szablon
+        extra = payload.model_dump(exclude_none=True, exclude={"key", "msg", "szablon"})
+    else:
+        # Plain text — cale body to wiadomosc
+        try:
+            body = await request.body()
+            msg = body.decode("utf-8").strip()
+        except Exception:
+            raise HTTPException(status_code=400, detail="Nie mozna odczytac body")
+
+        if not msg or len(msg) > 4000:
+            raise HTTPException(
+                status_code=400,
+                detail="Wiadomosc pusta lub za dluga (max 4000 znakow)",
+            )
+        klucz = klucz_z_url
+
+    # Walidacja klucza
+    if not klucz:
+        raise HTTPException(status_code=400, detail="Brak klucza (podaj w URL lub JSON)")
 
     ust = pobierz_ustawienia()
 
-    if not hmac.compare_digest(payload.key, ust.sec_key):
+    if not hmac.compare_digest(klucz, ust.sec_key):
         ip = request.client.host if request.client else "nieznany"
         logger.warning("Alert odrzucony (nieprawidlowy klucz) z IP: %s", ip)
         raise HTTPException(status_code=403, detail="Nieprawidlowy klucz")
 
+    # Obsluga szablonow
+    if szablon:
+        try:
+            msg = renderuj(szablon, dane_json)
+        except KeyError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+    # Walidacja — msg musi istniec (albo z body, albo z szablonu, albo z JSON)
+    if not msg:
+        raise HTTPException(status_code=400, detail="Brak wiadomosci (msg lub szablon)")
+
     logger.info("Alert odebrany — wysylanie do kanalow...")
-    wyniki = await asyncio.to_thread(wyslij_alert, payload.model_dump(exclude_none=True))
+    dane_alertu = {"msg": msg, **extra}
+    wyniki = await asyncio.to_thread(wyslij_alert, dane_alertu)
 
     if wyniki and not any(wyniki.values()):
         logger.error("Wszystkie kanaly zawiodly: %s", wyniki)
         raise HTTPException(status_code=502, detail="Wszystkie kanaly zawiodly")
 
     return {"status": "ok", "kanaly": wyniki}
+
+
+@app.post("/webhook")
+@limiter.limit("30/minute")
+async def webhook(request: Request):
+    """Endpoint webhook — stary format z kluczem w JSON body."""
+    return await _obsluz_webhook(request, klucz_z_url=None)
+
+
+@app.post("/webhook/{klucz}")
+@limiter.limit("30/minute")
+async def webhook_z_kluczem(request: Request, klucz: str):
+    """Endpoint webhook — klucz w URL, body jako JSON lub plain text."""
+    return await _obsluz_webhook(request, klucz_z_url=klucz)
 
 
 @app.post("/przeladuj-config")

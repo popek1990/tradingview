@@ -21,6 +21,10 @@ TIMEOUT_SIEC = 10  # sekundy — timeout na operacje sieciowe
 _tg_bot_lock = threading.Lock()
 _tg_bot_cache: tuple[str, Bot] | None = None
 
+# Cache nazw grup Telegram (id -> nazwa)
+_tg_names_lock = threading.Lock()
+_tg_names_cache: dict[str, str] = {}
+
 
 def _pobierz_tg_bot(token: str) -> Bot:
     """Zwraca cache'owana instancje bota Telegram (tworzy nowa przy zmianie tokena)."""
@@ -29,6 +33,23 @@ def _pobierz_tg_bot(token: str) -> Bot:
         if _tg_bot_cache is None or _tg_bot_cache[0] != token:
             _tg_bot_cache = (token, Bot(token=token))
         return _tg_bot_cache[1]
+
+
+def _pobierz_nazwe_grupy(bot: Bot, kanal_id: str) -> str:
+    """Zwraca nazwe grupy (title) z cache lub API. W razie bledu zwraca ID."""
+    global _tg_names_cache
+    with _tg_names_lock:
+        if kanal_id in _tg_names_cache:
+            return _tg_names_cache[kanal_id]
+
+    try:
+        chat_info = bot.get_chat(kanal_id)
+        nazwa = chat_info.title or chat_info.username or kanal_id
+        with _tg_names_lock:
+            _tg_names_cache[kanal_id] = nazwa
+        return nazwa
+    except Exception:
+        return kanal_id
 
 
 def wyslij_alert(data: dict[str, Any]) -> dict[str, bool]:
@@ -41,8 +62,10 @@ def wyslij_alert(data: dict[str, Any]) -> dict[str, bool]:
         try:
             tg_bot = _pobierz_tg_bot(ust.tg_token)
             kanal = data.get("telegram") or ust.kanal
+            nazwa_grupy = _pobierz_nazwe_grupy(tg_bot, kanal)
+
             tg_bot.sendMessage(kanal, msg, parse_mode="MARKDOWN", timeout=TIMEOUT_SIEC)
-            logger.info("Telegram: wyslano do %s", kanal)
+            logger.info("Telegram: wyslano do %s", nazwa_grupy)
             wyniki["telegram"] = True
         except Exception as e:
             logger.error("Telegram: %s", e)
@@ -52,8 +75,10 @@ def wyslij_alert(data: dict[str, Any]) -> dict[str, bool]:
     if ust.wyslij_alerty_telegram_2 and ust.kanal_2:
         try:
             tg_bot = _pobierz_tg_bot(ust.tg_token)
+            nazwa_grupy_2 = _pobierz_nazwe_grupy(tg_bot, ust.kanal_2)
+
             tg_bot.sendMessage(ust.kanal_2, msg, parse_mode="MARKDOWN", timeout=TIMEOUT_SIEC)
-            logger.info("Telegram 2: wyslano do %s", ust.kanal_2)
+            logger.info("Telegram 2: wyslano do %s", nazwa_grupy_2)
             wyniki["telegram_2"] = True
         except Exception as e:
             logger.error("Telegram 2: %s", e)

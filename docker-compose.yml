@@ -3,9 +3,10 @@ services:
     build: .
     container_name: TradingView-Webhook
     ports:
-      - "80:1990"       # Port 80 wymagany przez TradingView -> 1990 wewnatrz kontenera
+      - "127.0.0.1:80:1990"  # Tylko localhost — cloudflared laczy sie lokalnie
     volumes:
       - ./.env:/usr/src/app/.env
+      - ./szablony.json:/usr/src/app/szablony.json
       - logi:/usr/src/app/logs
     deploy:
       resources:
@@ -25,6 +26,7 @@ services:
       - WEBHOOK_URL=http://webhook:1990
     volumes:
       - ./.env:/usr/src/app/.env
+      - ./szablony.json:/usr/src/app/szablony.json
       - logi:/usr/src/app/logs
     deploy:
       resources:
