@@ -44,12 +44,12 @@ def render_ui_header():
 
         html, body, [class*="css"] { font-family: 'Courier New', Courier, monospace !important; }
 
-        /* Logout button in top right */
-        .logout-container {
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            z-index: 999999;
+        /* Logout button styling in header */
+        div[data-testid="column"]:nth-child(3) {
+            display: flex;
+            justify-content: flex-end;
+            align-items: flex-end;
+            padding-bottom: 15px;
         }
         
         h1, h2, h3, .stMetric label { color: #00FF41 !important; text-transform: uppercase; letter-spacing: 1px; }
@@ -93,8 +93,8 @@ def render_ui_header():
         </style>
     """, unsafe_allow_html=True)
 
-    # Naglowek Logo + Tytul
-    c1, c2 = st.columns([0.15, 1])
+    # Naglowek Logo + Tytul + Logout
+    c1, c2, c3 = st.columns([0.15, 1, 0.2])
     with c1:
         if os.path.exists("viking_logo.jpg"):
             st.image("viking_logo.jpg", width=80)
@@ -129,6 +129,7 @@ def render_ui_header():
             </div>
         """, unsafe_allow_html=True)
     st.markdown("---")
+    return c3  # Zwracamy kolumne dla przycisku logout
 
 def render_sidebar_info():
     """Wyswietla dodatkowe info w sidebarze."""

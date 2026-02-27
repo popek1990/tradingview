@@ -35,7 +35,7 @@ def sprawdz_logowanie():
     """Wymusza logowanie haslem z obsluga ciasteczek i ochrona brute-force."""
     
     # Globalne UI i CSS (wspolne dla wszystkich stron)
-    render_ui_header()
+    logout_col = render_ui_header()
     render_sidebar_info()
 
     cookie_manager = get_manager()
@@ -64,14 +64,13 @@ def sprawdz_logowanie():
         is_logged_in = True
 
     if is_logged_in:
-        # Logout button in top right
-        st.markdown('<div class="logout-container">', unsafe_allow_html=True)
-        if st.button("🚪 Logout", key="logout_btn"):
-            st.session_state["force_logout"] = True
-            st.session_state["auth_success"] = False
-            cookie_manager.delete(COOKIE_NAME)
-            st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
+        # Logout button inside the header column
+        with logout_col:
+            if st.button("🚪 Logout", key="logout_btn"):
+                st.session_state["force_logout"] = True
+                st.session_state["auth_success"] = False
+                cookie_manager.delete(COOKIE_NAME)
+                st.rerun()
         return
 
     # --- Ekran logowania ---
