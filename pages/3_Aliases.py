@@ -14,6 +14,18 @@ st.set_page_config(page_title="TradingView Alerts", page_icon="⚡", layout="wid
 
 check_login()
 
+# Page-specific CSS for compact buttons
+st.markdown("""
+<style>
+    .small-btn button {
+        font-size: 11px !important;
+        padding: 4px 8px !important;
+        min-height: 28px !important;
+        line-height: 1 !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 REGEX_NAME = re.compile(r"^[a-z0-9_-]{1,64}$")
 MAX_ALIASES = 50
 
@@ -44,7 +56,7 @@ if editing and editing in aliases:
     with st.form("form_edit_alias", border=True):
         new_name = st.text_input("ALIAS NAME (a-z, 0-9, _, -)", value=editing, max_chars=64)
         template = st.text_area("TEMPLATE CONTENT", value=aliases[editing]["template"],
-                                height=300, max_chars=4000,
+                                height=150, max_chars=4000,
                                 help="Use {variable} for placeholders, e.g. {ticker}")
         variables_str = st.text_input("VARIABLES (comma-separated)",
                                       value=", ".join(aliases[editing].get("variables", [])),
@@ -60,7 +72,6 @@ if editing and editing in aliases:
             if not REGEX_NAME.match(name_to_save):
                 st.error("INVALID NAME: use only a-z, 0-9, _, - (max 64 chars)")
                 st.stop()
-            # Handle rename
             if name_to_save != editing:
                 if name_to_save in aliases:
                     st.error(f"ALIAS '/{name_to_save}' ALREADY EXISTS")
@@ -85,8 +96,8 @@ if aliases:
         just_saved = st.session_state.just_saved_alias == name
         if just_saved:
             st.session_state.just_saved_alias = None
-        with st.expander(f"[/{name.upper()}]", expanded=just_saved):
-            col_preview, col_controls = st.columns([3, 1])
+        with st.expander(f"/`{name.upper()}`", expanded=just_saved):
+            col_preview, col_controls = st.columns([4, 1])
             with col_preview:
                 variables = data.get("variables", [])
                 st.markdown("**VARIABLES:** " + (", ".join(f"`{v}`" for v in variables) if variables else "_none_"))
@@ -97,6 +108,8 @@ if aliases:
                 st.code(preview, language=None)
 
             with col_controls:
+                st.markdown('<div class="small-btn">', unsafe_allow_html=True)
+                st.write("")  # vertical spacer
                 if st.button("EDIT", key=f"aedit_{name}", use_container_width=True):
                     st.session_state.edit_alias = name
                     st.rerun()
@@ -114,14 +127,13 @@ if aliases:
                             timeout=10,
                         )
                         if resp.status_code == 200:
-                            st.success("SENT TO TELEGRAM")
+                            st.success("SENT")
                         else:
-                            st.error(f"FAILED: HTTP {resp.status_code}")
+                            st.error(f"HTTP {resp.status_code}")
                     except Exception as e:
-                        st.error(f"ERROR: {e}")
-                # Two-step delete
+                        st.error(f"{e}")
                 if st.session_state.confirm_delete_alias == name:
-                    st.warning("Are you sure?")
+                    st.warning("Sure?")
                     c_yes, c_no = st.columns(2)
                     with c_yes:
                         if st.button("YES", key=f"ayes_{name}", use_container_width=True):
@@ -137,6 +149,7 @@ if aliases:
                     if st.button("DELETE", key=f"adel_{name}", use_container_width=True):
                         st.session_state.confirm_delete_alias = name
                         st.rerun()
+                st.markdown('</div>', unsafe_allow_html=True)
 
             # TradingView shortcut
             variables = data.get("variables", [])
@@ -158,7 +171,7 @@ if not editing:
     st.markdown("### NEW ALIAS")
     with st.form("form_new_alias", border=True):
         new_name = st.text_input("ALIAS NAME (a-z, 0-9, _, -)", max_chars=64)
-        new_template = st.text_area("TEMPLATE CONTENT", height=300, max_chars=4000,
+        new_template = st.text_area("TEMPLATE CONTENT", height=150, max_chars=4000,
                                     help="Use {variable} for placeholders, e.g. {ticker}")
         new_variables = st.text_input("VARIABLES (comma-separated)",
                                       help="Must match {placeholders} in template")
