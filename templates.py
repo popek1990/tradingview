@@ -40,7 +40,6 @@ def render(name: str, variables: dict) -> str:
 
     Raises:
         KeyError: if template doesn't exist
-        ValueError: if a required variable is missing
     """
     templates = load_templates()
     if name not in templates:

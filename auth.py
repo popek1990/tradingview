@@ -3,6 +3,7 @@
 import datetime
 import hmac
 import secrets
+import time
 
 import extra_streamlit_components as stx
 import streamlit as st
@@ -117,7 +118,6 @@ def check_login():
     st.title("Login")
 
     # Check global lockout
-    import time
     now = time.time()
     if global_lock["block_until"] > now:
         wait_s = int(global_lock["block_until"] - now)

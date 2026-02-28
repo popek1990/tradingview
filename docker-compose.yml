@@ -25,7 +25,7 @@ services:
     ports:
       - "0.0.0.0:8501:8501"  # Available on LAN — protected by password (DASHBOARD_PASSWORD)
     environment:
-      - WEBHOOK_URL=http://TradingView-Webhook:1990
+      - WEBHOOK_URL=http://webhook:1990
     volumes:
       - ./.env:/usr/src/app/.env
       - ./templates.json:/usr/src/app/templates.json
