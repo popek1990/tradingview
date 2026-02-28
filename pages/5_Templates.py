@@ -7,7 +7,7 @@ from templates import load_templates, save_templates
 from ui_utils import safe_html
 
 # Must be first Streamlit command
-st.set_page_config(page_title="TV-BOT | TEMPLATES", page_icon="📝", layout="wide")
+st.set_page_config(page_title="TradingView Alerts", page_icon="📝", layout="wide")
 
 check_login()
 

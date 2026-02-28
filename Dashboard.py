@@ -5,7 +5,7 @@ from auth import check_login
 from config import Settings
 
 # Dashboard configuration
-st.set_page_config(page_title="TV-BOT TERMINAL", page_icon="📟", layout="wide")
+st.set_page_config(page_title="TradingView Alerts", page_icon="📟", layout="wide")
 check_login()
 
 # Settings loaded after login check

@@ -159,7 +159,7 @@ def render_ui_header():
     with c2:
         st.markdown(f"""
             <div style="padding-top: 5px;">
-                <h1 style="margin: 0; font-size: 28px;">⚠️ TradingView Alerts to Discord, Telegram or Slack</h1>
+                <h1 style="margin: 0; font-size: 28px;">TradingView Alerts to Discord, Telegram or Slack</h1>
             </div>
         """, unsafe_allow_html=True)
 
