@@ -155,7 +155,7 @@ def render_ui_header():
         if os.path.exists(logo_path):
             st.image(logo_path, width=80)
         else:
-            st.markdown("### ⚡")
+            pass
     with c2:
         st.markdown(f"""
             <div style="padding-top: 5px;">
