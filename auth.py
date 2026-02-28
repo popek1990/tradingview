@@ -91,8 +91,10 @@ def check_login():
         st.session_state["force_logout"] = False
         st.rerun()
 
-    # Check cookie
+    # Check cookie (CookieManager needs a render cycle to load)
     cookies = cookie_manager.get_all()
+    if cookies is None:
+        st.stop()
     token = cookies.get(COOKIE_NAME)
 
     is_logged_in = False
