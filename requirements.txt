@@ -1,15 +1,15 @@
-# Serwer
+# Server
 fastapi>=0.104.0
 uvicorn[standard]>=0.24.0
 pydantic-settings>=2.1.0
 python-dotenv>=1.0.0
 
-# Kanaly powiadomien
+# Notification channels
 python-telegram-bot==13.6
-urllib3<2                        # wymagane przez python-telegram-bot 13.6
+urllib3<2                        # required by python-telegram-bot 13.6
 discord-webhook>=1.0.0
 
-# Bezpieczenstwo
+# Security
 slowapi>=0.1.9
 
 # HTTP
@@ -19,7 +19,7 @@ requests>=2.28.0
 streamlit>=1.30.0
 extra-streamlit-components>=0.1.71
 
-# Testy
+# Tests
 pytest>=7.0.0
 pytest-asyncio>=0.21.0
 httpx>=0.24.0

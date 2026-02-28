@@ -53,7 +53,7 @@ if templates:
                         st.session_state.confirm_delete = name; st.rerun()
 
             # TradingView JSON
-            variables_json = ", ".join(f'"{v}": "{{{{{{{v}}}}}}}"' for v in data.get("variables", []))
+            variables_json = ", ".join('"' + v + '": "{{' + v + '}}"' for v in data.get("variables", []))
             tv_json = '{"template": "' + name + '"'
             if variables_json: tv_json += ", " + variables_json
             tv_json += "}"

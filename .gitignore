@@ -104,7 +104,7 @@ celerybeat.pid
 # Environments
 .env
 
-# Pliki projektu
+# Project files
 plan.md
 AUDIT_REPORT.md
 CLAUDE.md

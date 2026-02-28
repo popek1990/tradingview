@@ -19,7 +19,7 @@ from starlette.responses import JSONResponse
 
 from config import get_settings, reload_settings
 from handler import send_alert
-from templates import render, load_templates
+from templates import render
 
 # Logging
 LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
@@ -84,7 +84,7 @@ app.state.limiter = limiter
 # Trusted Host middleware
 app.add_middleware(
     TrustedHostMiddleware,
-    allowed_hosts=["tv.popeklab.com", "localhost", "127.0.0.1", "TradingView-Webhook", "test", "testserver"],
+    allowed_hosts=["tv.popeklab.com", "localhost", "127.0.0.1", "webhook", "test", "testserver"],
 )
 
 
