@@ -16,7 +16,7 @@ COOKIE_NAME = "tv_bot_session"
 SESSION_TTL_DAYS = 1
 
 
-@st.cache_resource(experimental_allow_widgets=True)
+@st.cache_resource
 def get_manager():
     """Returns cookie manager instance."""
     return stx.CookieManager()
