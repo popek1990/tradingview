@@ -51,7 +51,12 @@ else:
             st.caption(f"STREAMING {len(lines)} LINES...")
             # html.escape() — XSS protection
             log_text = safe_html("".join(lines))
-            st.markdown(f'<div class="terminal-log" style="height: 500px; overflow-y: scroll; white-space: pre-wrap; font-size: 12px;">{log_text}</div>', unsafe_allow_html=True)
+            st.markdown(
+                f'<div class="terminal-log" style="height: 500px; overflow-y: auto; display: flex; flex-direction: column-reverse;">'
+                f'<div style="white-space: pre-wrap; font-size: 12px; width: 100%;">{log_text}</div>'
+                f'</div>', 
+                unsafe_allow_html=True
+            )
         else:
             st.info("NO LOGS MATCHING CRITERIA")
     except Exception as e:
