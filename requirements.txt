@@ -17,7 +17,6 @@ requests>=2.28.0
 
 # Frontend
 streamlit>=1.30.0
-extra-streamlit-components>=0.1.71
 
 # Tests
 pytest>=7.0.0
