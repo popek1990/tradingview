@@ -8,7 +8,7 @@ from auth import check_login
 from ui_utils import safe_html
 
 # Must be first Streamlit command
-st.set_page_config(page_title="TV-BOT | LOGS", page_icon="📋", layout="wide")
+st.set_page_config(page_title="TradingView Alerts", page_icon="📋", layout="wide")
 
 check_login()
 

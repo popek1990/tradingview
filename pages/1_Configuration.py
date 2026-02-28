@@ -6,7 +6,7 @@ from config import Settings
 from ui_utils import save_and_reload
 
 # Must be first Streamlit command
-st.set_page_config(page_title="TV-BOT | CONFIG", page_icon="🔑", layout="wide")
+st.set_page_config(page_title="TradingView Alerts", page_icon="🔑", layout="wide")
 
 check_login()
 
