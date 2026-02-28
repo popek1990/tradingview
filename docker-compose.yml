@@ -7,6 +7,7 @@ services:
     volumes:
       - ./.env:/usr/src/app/.env:ro  # Read-only for webhook (doesn't write to .env)
       - ./templates.json:/usr/src/app/templates.json:ro
+      - ./aliases.json:/usr/src/app/aliases.json:ro
       - logs:/usr/src/app/logs
     security_opt:
       - no-new-privileges:true
