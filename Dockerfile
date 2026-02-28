@@ -6,7 +6,7 @@ WORKDIR /usr/src/app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY main.py handler.py config.py templates.py ./
+COPY main.py handler.py config.py templates.py aliases.py ./
 
 # Non-root user (principle of least privilege)
 RUN groupadd -g 1000 appgrp && useradd -u 1000 -g appgrp appuser \
