@@ -202,9 +202,17 @@ def render_sidebar_info():
     """Displays additional info in sidebar."""
     with st.sidebar:
         st.markdown("---")
-        st.code("SYSTEM:  POPEK-LAB-CORE\nKERNEL:  3.12-DOCKER\nUPTIME:  ACTIVE", language=None)
         st.markdown(
+            '<div style="font-size: 11px; color: #484F58; font-family: monospace;">'
+            'SYSTEM: <code>POPEK-LAB-CORE</code><br>'
+            'KERNEL: <code>3.12-DOCKER</code><br>'
+            'UPTIME: <code>ACTIVE</code></div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            '<div style="text-align: center; margin-top: 8px;">'
             '<a href="https://github.com/popek1990/Tradingview" target="_blank" '
-            'style="font-size: 10px; color: #484F58;">GitHub Repository</a>',
+            'style="font-size: 11px; color: #484F58; text-decoration: none;">'
+            '\U0001f517 GitHub Repository</a></div>',
             unsafe_allow_html=True,
         )
