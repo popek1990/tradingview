@@ -17,6 +17,7 @@ from slowapi.errors import RateLimitExceeded
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.responses import JSONResponse
 
+from aliases import parse_alias
 from config import get_settings, reload_settings
 from handler import send_alert
 from templates import render
@@ -198,6 +199,15 @@ async def _handle_webhook(request: Request, key_from_url: str | None) -> dict:
         ip = request.client.host if request.client else "unknown"
         logger.warning("Alert rejected (invalid key) from IP: %s", ip)
         raise HTTPException(status_code=403, detail="Invalid key")
+
+    # Alias handling (e.g., "/spot BTCUSDT BINANCE 68000")
+    if msg and msg.startswith("/"):
+        try:
+            alias_result = parse_alias(msg)
+            if alias_result is not None:
+                msg = alias_result
+        except (KeyError, ValueError) as e:
+            raise HTTPException(status_code=400, detail=str(e))
 
     # Template handling
     if template_name:

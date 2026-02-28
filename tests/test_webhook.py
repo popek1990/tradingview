@@ -236,6 +236,88 @@ class TestWebhookTemplates:
         assert resp.status_code == 200
 
 
+class TestWebhookAliases:
+    """Tests for alias system (e.g., /spot BTCUSDT BINANCE 68000)."""
+
+    @pytest.fixture(autouse=True)
+    def _test_aliases(self, tmp_path, monkeypatch):
+        """Creates a temporary aliases file for tests."""
+        import aliases as mod
+        file = tmp_path / "aliases.json"
+        data = {
+            "spot": {
+                "variables": ["ticker", "exchange", "close"],
+                "template": "Target #{ticker} on {exchange} price {close}",
+            },
+            "simple": {
+                "variables": [],
+                "template": "Fixed alert message",
+            },
+        }
+        file.write_text(json.dumps(data), encoding="utf-8")
+        monkeypatch.setattr(mod, "ALIASES_FILE", file)
+
+    @pytest.mark.asyncio
+    async def test_alias_valid(self, client, monkeypatch):
+        """Valid alias with correct args — 200."""
+        monkeypatch.setenv("SEND_ALERTS_TELEGRAM", "False")
+        async with client as c:
+            resp = await c.post(
+                "/webhook/test_secret_key_123",
+                content="/spot BTCUSDT BINANCE 68000",
+                headers={"content-type": "text/plain"},
+            )
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "ok"
+
+    @pytest.mark.asyncio
+    async def test_alias_no_variables(self, client, monkeypatch):
+        """Alias with zero variables — 200."""
+        monkeypatch.setenv("SEND_ALERTS_TELEGRAM", "False")
+        async with client as c:
+            resp = await c.post(
+                "/webhook/test_secret_key_123",
+                content="/simple",
+                headers={"content-type": "text/plain"},
+            )
+        assert resp.status_code == 200
+
+    @pytest.mark.asyncio
+    async def test_alias_unknown(self, client):
+        """Unknown alias — 400."""
+        async with client as c:
+            resp = await c.post(
+                "/webhook/test_secret_key_123",
+                content="/nonexistent",
+                headers={"content-type": "text/plain"},
+            )
+        assert resp.status_code == 400
+        assert "Unknown alias" in resp.json()["detail"]
+
+    @pytest.mark.asyncio
+    async def test_alias_wrong_arg_count(self, client):
+        """Alias with wrong number of args — 400."""
+        async with client as c:
+            resp = await c.post(
+                "/webhook/test_secret_key_123",
+                content="/spot BTCUSDT",
+                headers={"content-type": "text/plain"},
+            )
+        assert resp.status_code == 400
+        assert "expects 3 args" in resp.json()["detail"]
+
+    @pytest.mark.asyncio
+    async def test_alias_bad_key(self, client):
+        """Alias with wrong key — 403 (key checked before alias)."""
+        async with client as c:
+            resp = await c.post(
+                "/webhook/wrong_key_pad_16",
+                content="/spot BTCUSDT BINANCE 68000",
+                headers={"content-type": "text/plain"},
+            )
+        assert resp.status_code == 403
+
+
 class TestReloadConfig:
     @pytest.mark.asyncio
     async def test_valid_reload(self, client):
