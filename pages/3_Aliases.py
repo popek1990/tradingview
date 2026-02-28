@@ -27,19 +27,24 @@ if "edit_alias" not in st.session_state:
     st.session_state.edit_alias = None
 if "confirm_delete_alias" not in st.session_state:
     st.session_state.confirm_delete_alias = None
+if "just_saved_alias" not in st.session_state:
+    st.session_state.just_saved_alias = None
 
 # --- Editor at the top when editing ---
 editing = st.session_state.edit_alias
 if editing and editing in aliases:
-    st.markdown(f"### EDITING: /{editing.upper()}")
+    st.markdown(
+        f'<h3><span style="color: #00FF41;">EDITING:</span> /{editing.upper()}</h3>',
+        unsafe_allow_html=True,
+    )
     if st.button("CANCEL"):
         st.session_state.edit_alias = None
         st.rerun()
 
     with st.form("form_edit_alias", border=True):
-        st.text_input("ALIAS NAME", value=editing, disabled=True)
+        new_name = st.text_input("ALIAS NAME (a-z, 0-9, _, -)", value=editing, max_chars=64)
         template = st.text_area("TEMPLATE CONTENT", value=aliases[editing]["template"],
-                                height=150, max_chars=4000,
+                                height=300, max_chars=4000,
                                 help="Use {variable} for placeholders, e.g. {ticker}")
         variables_str = st.text_input("VARIABLES (comma-separated)",
                                       value=", ".join(aliases[editing].get("variables", [])),
@@ -48,13 +53,27 @@ if editing and editing in aliases:
             if not template.strip():
                 st.error("TEMPLATE CONTENT REQUIRED")
                 st.stop()
-            aliases[editing] = {
+            name_to_save = new_name.strip().lower().replace(" ", "_")
+            if not name_to_save:
+                st.error("ALIAS NAME REQUIRED")
+                st.stop()
+            if not REGEX_NAME.match(name_to_save):
+                st.error("INVALID NAME: use only a-z, 0-9, _, - (max 64 chars)")
+                st.stop()
+            # Handle rename
+            if name_to_save != editing:
+                if name_to_save in aliases:
+                    st.error(f"ALIAS '/{name_to_save}' ALREADY EXISTS")
+                    st.stop()
+                del aliases[editing]
+            aliases[name_to_save] = {
                 "template": template,
                 "variables": [v.strip() for v in variables_str.split(",") if v.strip()],
             }
             save_aliases(aliases)
-            st.success(f"UPDATED '/{editing}'")
+            st.success(f"SAVED '/{name_to_save}'")
             st.session_state.edit_alias = None
+            st.session_state.just_saved_alias = name_to_save
             st.rerun()
 
     st.markdown("---")
@@ -63,7 +82,10 @@ if editing and editing in aliases:
 if aliases:
     st.markdown("### ACTIVE ALIASES")
     for name, data in aliases.items():
-        with st.expander(f"[/{name.upper()}]", expanded=False):
+        just_saved = st.session_state.just_saved_alias == name
+        if just_saved:
+            st.session_state.just_saved_alias = None
+        with st.expander(f"[/{name.upper()}]", expanded=just_saved):
             col_preview, col_controls = st.columns([3, 1])
             with col_preview:
                 variables = data.get("variables", [])
@@ -136,7 +158,7 @@ if not editing:
     st.markdown("### NEW ALIAS")
     with st.form("form_new_alias", border=True):
         new_name = st.text_input("ALIAS NAME (a-z, 0-9, _, -)", max_chars=64)
-        new_template = st.text_area("TEMPLATE CONTENT", height=150, max_chars=4000,
+        new_template = st.text_area("TEMPLATE CONTENT", height=300, max_chars=4000,
                                     help="Use {variable} for placeholders, e.g. {ticker}")
         new_variables = st.text_input("VARIABLES (comma-separated)",
                                       help="Must match {placeholders} in template")
