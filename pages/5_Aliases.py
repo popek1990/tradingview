@@ -1,10 +1,14 @@
 """Webhook Aliases — Quick shortcuts for TradingView alerts."""
 
+import json
 import re
+
+import requests
 import streamlit as st
 from auth import check_login
 from aliases import load_aliases, save_aliases
-from ui_utils import safe_html
+from config import Settings
+from ui_utils import WEBHOOK_URL, safe_html
 
 # Must be first Streamlit command
 st.set_page_config(page_title="TradingView Alerts", page_icon="⚡", layout="wide")
@@ -45,6 +49,28 @@ if aliases:
                 if st.button("EDIT", key=f"aedit_{name}", use_container_width=True):
                     st.session_state.edit_alias = name
                     st.rerun()
+                if st.button("TEST", key=f"atest_{name}", use_container_width=True):
+                    settings = Settings()
+                    test_values = {v: f"TEST_{v.upper()}" for v in variables}
+                    # Use realistic defaults for common variables
+                    defaults = {"ticker": "BTCUSDT", "exchange": "BINANCE", "close": "69000.00",
+                                "open": "68000.00", "high": "70000.00", "low": "67000.00",
+                                "volume": "1234.56", "interval": "1D", "time": "2026-02-28"}
+                    for v in variables:
+                        test_values[v] = defaults.get(v, f"TEST_{v.upper()}")
+                    test_msg = f"/{name} " + " ".join(test_values[v] for v in variables) if variables else f"/{name}"
+                    try:
+                        resp = requests.post(
+                            f"{WEBHOOK_URL}/webhook",
+                            json={"key": settings.sec_key, "msg": test_msg},
+                            timeout=10,
+                        )
+                        if resp.status_code == 200:
+                            st.success("SENT TO TELEGRAM")
+                        else:
+                            st.error(f"FAILED: HTTP {resp.status_code}")
+                    except Exception as e:
+                        st.error(f"ERROR: {e}")
                 # Two-step delete confirmation
                 if st.session_state.confirm_delete_alias == name:
                     st.warning("Are you sure?")
