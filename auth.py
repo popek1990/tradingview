@@ -5,20 +5,14 @@ import hmac
 import secrets
 import time
 
-import extra_streamlit_components as stx
 import streamlit as st
 from config import Settings
 from ui_utils import render_ui_header, render_sidebar_info
 
 MAX_ATTEMPTS = 10
 LOCKOUT_SECONDS = 900  # 15 minutes
-COOKIE_NAME = "tv_bot_session"
+SESSION_PARAM = "s"  # query param name for session token
 SESSION_TTL_DAYS = 1
-
-
-def get_manager():
-    """Returns cookie manager instance."""
-    return stx.CookieManager(key="tv_bot_cookie_manager")
 
 
 @st.cache_resource
@@ -34,7 +28,7 @@ def get_active_sessions():
 
 
 def _generate_session_token() -> str:
-    """Generates a random session token (instead of SHA-256 password hash)."""
+    """Generates a random session token."""
     return secrets.token_hex(32)
 
 
@@ -69,46 +63,35 @@ def _invalidate_session(token: str) -> None:
 
 
 def check_login():
-    """Enforces password login with cookie handling and brute-force protection."""
+    """Enforces password login with query param session persistence."""
 
     # Global UI and CSS (shared across all pages)
     logout_col = render_ui_header()
     render_sidebar_info()
 
-    cookie_manager = get_manager()
     global_lock = get_global_lock()
     settings = Settings()
 
-    # Check if just logged out (force logout flag)
+    # Check if just logged out
     if st.session_state.get("force_logout", False):
-        # Invalidate session server-side
-        cookies = cookie_manager.get_all()
-        old_token = cookies.get(COOKIE_NAME)
+        old_token = st.query_params.get(SESSION_PARAM)
         if old_token:
             _invalidate_session(str(old_token))
-        cookie_manager.delete(COOKIE_NAME)
+        if SESSION_PARAM in st.query_params:
+            del st.query_params[SESSION_PARAM]
         st.session_state["auth_success"] = False
         st.session_state["force_logout"] = False
         st.rerun()
 
-    # CookieManager needs a render cycle to read cookies from browser.
-    # First render returns None or {} — wait one cycle before deciding.
-    cookies = cookie_manager.get_all()
-    if not cookies:
-        if "_cookie_waited" not in st.session_state:
-            st.session_state["_cookie_waited"] = True
-            st.stop()
-    else:
-        st.session_state["_cookie_waited"] = False
-
-    token = cookies.get(COOKIE_NAME) if cookies else None
+    # Read session token from query params (persists across refresh)
+    token = st.query_params.get(SESSION_PARAM)
 
     is_logged_in = False
 
     # Priority 1: Temporary session (right after entering password)
     if st.session_state.get("auth_success", False):
         is_logged_in = True
-    # Priority 2: Cookie with server-side validation
+    # Priority 2: Token in URL with server-side validation
     elif token and _validate_session(str(token)):
         is_logged_in = True
 
@@ -118,7 +101,6 @@ def check_login():
             if st.button("Logout", key="logout_btn"):
                 st.session_state["force_logout"] = True
                 st.session_state["auth_success"] = False
-                cookie_manager.delete(COOKIE_NAME)
                 st.rerun()
         return
 
@@ -145,9 +127,8 @@ def check_login():
             # Generate random token and save server-side
             new_token = _generate_session_token()
             _save_session(new_token)
-            expires = datetime.datetime.now() + datetime.timedelta(days=SESSION_TTL_DAYS)
-            cookie_manager.set(COOKIE_NAME, new_token, expires_at=expires)
-            st.success("Logging in...")
+            # Persist in URL query params (survives F5 refresh)
+            st.query_params[SESSION_PARAM] = new_token
             st.rerun()
         else:
             # Failure — increment counter
