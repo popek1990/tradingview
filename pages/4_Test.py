@@ -21,7 +21,7 @@ st.subheader("WEBHOOK PIPELINE TEST")
 with st.form("form_test", border=True):
     msg = st.text_area(
         "ALERT PAYLOAD (Plain Text or JSON Template)",
-        value='{"template": "target_long_term", "ticker": "BTCUSDT", "exchange": "BINANCE", "close": "69000"}',
+        value="\u2705 Webhook connection test - PASSED",
         max_chars=4000,
         height=150
     )

@@ -49,12 +49,16 @@ else:
 
         if lines:
             st.caption(f"STREAMING {len(lines)} LINES...")
-            # html.escape() — XSS protection
+            # html.escape() — XSS protection, then add emoji indicators
             log_text = safe_html("".join(lines))
+            log_text = log_text.replace("[ERROR]", "\U0001f534 [ERROR]")
+            log_text = log_text.replace("[WARNING]", "\U0001f7e1 [WARNING]")
+            log_text = log_text.replace("[INFO]", "\U0001f7e2 [INFO]")
+            log_text = log_text.replace("[DEBUG]", "\u26aa [DEBUG]")
             st.markdown(
                 f'<div class="terminal-log" style="height: 500px; overflow-y: auto; display: flex; flex-direction: column-reverse;">'
                 f'<div style="white-space: pre-wrap; font-size: 12px; width: 100%;">{log_text}</div>'
-                f'</div>', 
+                f'</div>',
                 unsafe_allow_html=True
             )
         else:
