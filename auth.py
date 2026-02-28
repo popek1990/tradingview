@@ -91,11 +91,17 @@ def check_login():
         st.session_state["force_logout"] = False
         st.rerun()
 
-    # Check cookie (CookieManager needs a render cycle to load)
+    # CookieManager needs a render cycle to read cookies from browser.
+    # First render returns None or {} — wait one cycle before deciding.
     cookies = cookie_manager.get_all()
-    if cookies is None:
-        st.stop()
-    token = cookies.get(COOKIE_NAME)
+    if not cookies:
+        if "_cookie_waited" not in st.session_state:
+            st.session_state["_cookie_waited"] = True
+            st.stop()
+    else:
+        st.session_state["_cookie_waited"] = False
+
+    token = cookies.get(COOKIE_NAME) if cookies else None
 
     is_logged_in = False
 
