@@ -68,24 +68,9 @@ async def lifespan(app: FastAPI):
         logger.critical("Permission denied to read .env! Please run 'chmod 664 .env' on the host machine.")
         raise SystemExit(1)
 
-    if not settings.sec_key or len(settings.sec_key) < 16:
-        logger.warning("SEC_KEY is missing or too short (min. 16 chars). Attempting to auto-generate...")
-        try:
-            import secrets
-            from dotenv import set_key
-            
-            new_key = secrets.token_hex(32)
-            # Create .env if it doesn't exist
-            if not os.path.exists(env_path):
-                open(env_path, 'a').close()
-                os.chmod(env_path, 0o664)
-                
-            set_key(env_path, "SEC_KEY", new_key)
-            settings.sec_key = new_key
-            logger.info("Successfully auto-generated a new secure SEC_KEY and saved it to .env.")
-        except Exception as e:
-            logger.critical(f"Failed to auto-generate SEC_KEY: {e}. Please set SEC_KEY in .env manually or fix permissions (chmod 664 .env).")
-            raise SystemExit(1)
+    if not settings.sec_key:
+        logger.critical("SEC_KEY is empty. Please set SEC_KEY in .env.")
+        raise SystemExit(1)
             
     logger.info("Server started — SEC_KEY configured")
     yield
