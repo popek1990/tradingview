@@ -71,11 +71,11 @@ with st.form("form_channels", border=True):
     col_tg1, col_tg2 = st.columns(2)
     with col_tg1:
         st.markdown("#### TELEGRAM GROUP 1")
-        tg_enabled = st.toggle("ENABLE GROUP 1", value=settings.send_alerts_telegram)
+        tg_enabled = st.toggle("ENABLE", value=settings.send_alerts_telegram, key="tg1_toggle")
         channel = render_group_selector("Group 1", settings.channel, "grp1")
     with col_tg2:
         st.markdown("#### TELEGRAM GROUP 2")
-        tg_enabled_2 = st.toggle("ENABLE GROUP 2", value=settings.send_alerts_telegram_2)
+        tg_enabled_2 = st.toggle("ENABLE", value=settings.send_alerts_telegram_2, key="tg2_toggle")
         channel_2 = render_group_selector("Group 2", settings.channel_2, "grp2")
 
     st.markdown("---")
@@ -83,15 +83,19 @@ with st.form("form_channels", border=True):
     col_dc, col_sl = st.columns(2)
     with col_dc:
         st.markdown("#### DISCORD")
-        dc_enabled = st.toggle("ENABLE DISCORD", value=settings.send_alerts_discord)
-        if settings.discord_webhook:
+        dc_has_webhook = bool(settings.discord_webhook)
+        dc_enabled = st.toggle("ENABLE", value=settings.send_alerts_discord and dc_has_webhook,
+                               disabled=not dc_has_webhook, key="dc_toggle")
+        if dc_has_webhook:
             st.caption("Webhook: configured (edit in Configuration)")
         else:
             st.warning("Webhook: NOT SET (configure in Configuration page)")
     with col_sl:
         st.markdown("#### SLACK")
-        sl_enabled = st.toggle("ENABLE SLACK", value=settings.send_alerts_slack)
-        if settings.slack_webhook:
+        sl_has_webhook = bool(settings.slack_webhook)
+        sl_enabled = st.toggle("ENABLE", value=settings.send_alerts_slack and sl_has_webhook,
+                               disabled=not sl_has_webhook, key="sl_toggle")
+        if sl_has_webhook:
             st.caption("Webhook: configured (edit in Configuration)")
         else:
             st.warning("Webhook: NOT SET (configure in Configuration page)")
