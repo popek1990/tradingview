@@ -106,6 +106,8 @@ celerybeat.pid
 
 # Project files
 plan.md
+ENV_EXPORT.txt
+PYTHON_VERSION.txt
 AUDIT_REPORT.md
 CLAUDE.md
 GEMINI.md
