@@ -1,8 +1,12 @@
-"""Shared authentication module for the Streamlit panel."""
+"""Shared authentication module for the Streamlit panel.
 
-import datetime
+Uses HMAC-signed session tokens that are self-validating — no server-side
+session storage needed.  Token is persisted in both st.session_state (survives
+page navigation) and st.query_params (survives browser F5 refresh).
+"""
+
+import hashlib
 import hmac
-import secrets
 import time
 
 import streamlit as st
@@ -12,102 +16,110 @@ from ui_utils import render_ui_header, render_sidebar_info
 MAX_ATTEMPTS = 10
 LOCKOUT_SECONDS = 900  # 15 minutes
 SESSION_PARAM = "s"  # query param name for session token
-SESSION_TTL_DAYS = 1
+SESSION_TTL = 86400  # 24 hours in seconds
 
 
 @st.cache_resource
-def get_global_lock():
+def _get_global_lock():
     """Global failed login counter (shared between sessions)."""
     return {"fail_count": 0, "block_until": 0.0}
 
 
 @st.cache_resource
-def get_active_sessions():
-    """Server-side storage of active session tokens."""
-    return {}  # {token_hex: expiry_timestamp}
+def _get_invalidated_tokens():
+    """Blacklist for logged-out tokens (lost on server restart — acceptable)."""
+    return set()
 
 
-def _generate_session_token() -> str:
-    """Generates a random session token."""
-    return secrets.token_hex(32)
+# ── Token helpers ────────────────────────────────────────────────
+
+def _create_token(secret: str) -> str:
+    """Creates a self-signed session token: ``timestamp.signature``.
+
+    No server-side storage needed — validated purely via HMAC.
+    """
+    ts = str(int(time.time()))
+    sig = hmac.new(secret.encode(), ts.encode(), hashlib.sha256).hexdigest()[:32]
+    return f"{ts}.{sig}"
 
 
-def _save_session(token: str) -> None:
-    """Saves session token server-side with expiration date."""
-    sessions = get_active_sessions()
-    expiry = datetime.datetime.now() + datetime.timedelta(days=SESSION_TTL_DAYS)
-    sessions[token] = expiry.timestamp()
-    # Clean up expired sessions
-    now = datetime.datetime.now().timestamp()
-    expired = [t for t, exp in sessions.items() if exp < now]
-    for t in expired:
-        del sessions[t]
+def _validate_token(token: str, secret: str) -> bool:
+    """Validates HMAC signature, checks expiry and logout blacklist."""
+    try:
+        parts = token.split(".")
+        if len(parts) != 2:
+            return False
+        ts_str, sig = parts
+        ts = int(ts_str)
 
+        if time.time() - ts > SESSION_TTL:
+            return False
 
-def _validate_session(token: str) -> bool:
-    """Checks if session token is active and not expired."""
-    sessions = get_active_sessions()
-    if token not in sessions:
+        expected = hmac.new(
+            secret.encode(), ts_str.encode(), hashlib.sha256,
+        ).hexdigest()[:32]
+        if not hmac.compare_digest(sig, expected):
+            return False
+
+        return token not in _get_invalidated_tokens()
+    except (ValueError, TypeError):
         return False
-    now = datetime.datetime.now().timestamp()
-    if sessions[token] < now:
-        del sessions[token]
-        return False
-    return True
 
 
-def _invalidate_session(token: str) -> None:
-    """Removes session token (logout)."""
-    sessions = get_active_sessions()
-    sessions.pop(token, None)
-
+# ── Main entry point ─────────────────────────────────────────────
 
 def check_login():
-    """Enforces password login with query param session persistence."""
+    """Enforces password login with self-signed token session persistence."""
 
-    # Global UI and CSS (shared across all pages)
+    # Global UI and CSS (rendered for all users, including login screen)
     logout_col = render_ui_header()
     render_sidebar_info()
 
-    global_lock = get_global_lock()
+    global_lock = _get_global_lock()
     settings = Settings()
+    secret = settings.dashboard_password
 
-    # Check if just logged out
-    if st.session_state.get("force_logout", False):
-        old_token = st.query_params.get(SESSION_PARAM)
+    # ── Handle logout ────────────────────────────────────────────
+    if st.session_state.get("force_logout"):
+        old_token = (
+            st.session_state.get("session_token")
+            or st.query_params.get(SESSION_PARAM)
+        )
         if old_token:
-            _invalidate_session(str(old_token))
+            _get_invalidated_tokens().add(str(old_token))
         if SESSION_PARAM in st.query_params:
             del st.query_params[SESSION_PARAM]
-        st.session_state["auth_success"] = False
-        st.session_state["force_logout"] = False
+        st.session_state.pop("session_token", None)
+        st.session_state.pop("force_logout", None)
         st.rerun()
 
-    # Read session token from query params (persists across refresh)
-    token = st.query_params.get(SESSION_PARAM)
+    # ── Restore token ────────────────────────────────────────────
+    # Priority: session_state (page navigation) > query_params (F5 refresh)
+    token = (
+        st.session_state.get("session_token")
+        or st.query_params.get(SESSION_PARAM)
+    )
 
-    is_logged_in = False
+    if token and _validate_token(str(token), secret):
+        token = str(token)
 
-    # Priority 1: Temporary session (right after entering password)
-    if st.session_state.get("auth_success", False):
-        is_logged_in = True
-    # Priority 2: Token in URL with server-side validation
-    elif token and _validate_session(str(token)):
-        is_logged_in = True
+        # Sync → session_state (survives sidebar page navigation)
+        if st.session_state.get("session_token") != token:
+            st.session_state["session_token"] = token
 
-    if is_logged_in:
-        # Logout button inside the header column
+        # Sync → query_params (survives F5 refresh)
+        if st.query_params.get(SESSION_PARAM) != token:
+            st.query_params[SESSION_PARAM] = token
+
         with logout_col:
             if st.button("Logout", key="logout_btn"):
                 st.session_state["force_logout"] = True
-                st.session_state["auth_success"] = False
                 st.rerun()
         return
 
-    # --- Login screen ---
+    # ── Login screen ─────────────────────────────────────────────
     st.title("Login")
 
-    # Check global lockout
     now = time.time()
     if global_lock["block_until"] > now:
         wait_s = int(global_lock["block_until"] - now)
@@ -119,19 +131,13 @@ def check_login():
         submit = st.form_submit_button("Log In")
 
     if submit:
-        if hmac.compare_digest(password, settings.dashboard_password):
-            # Success — reset counter
+        if hmac.compare_digest(password, secret):
             global_lock["fail_count"] = 0
-            # Set session flag (immediate access)
-            st.session_state["auth_success"] = True
-            # Generate random token and save server-side
-            new_token = _generate_session_token()
-            _save_session(new_token)
-            # Persist in URL query params (survives F5 refresh)
+            new_token = _create_token(secret)
+            st.session_state["session_token"] = new_token
             st.query_params[SESSION_PARAM] = new_token
             st.rerun()
         else:
-            # Failure — increment counter
             global_lock["fail_count"] += 1
             if global_lock["fail_count"] >= MAX_ATTEMPTS:
                 global_lock["block_until"] = time.time() + LOCKOUT_SECONDS
