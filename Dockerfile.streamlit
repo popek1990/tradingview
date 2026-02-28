@@ -6,7 +6,7 @@ WORKDIR /usr/src/app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY Dashboard.py auth.py config.py templates.py ui_utils.py viking_logo.jpg ./
+COPY Dashboard.py auth.py config.py templates.py aliases.py ui_utils.py viking_logo.jpg ./
 COPY pages/ ./pages/
 COPY .streamlit/ ./.streamlit/
 

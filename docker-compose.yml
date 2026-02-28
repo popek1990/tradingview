@@ -30,6 +30,7 @@ services:
     volumes:
       - ./.env:/usr/src/app/.env
       - ./templates.json:/usr/src/app/templates.json
+      - ./aliases.json:/usr/src/app/aliases.json
       - logs:/usr/src/app/logs
     security_opt:
       - no-new-privileges:true
