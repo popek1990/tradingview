@@ -116,10 +116,19 @@ def render_ui_header():
             border-radius: 2px !important;
             transition: all 0.3s ease;
         }
-        .stButton > button:hover {
+        .stButton > button:hover,
+        .stFormSubmitButton > button:hover {
             background-color: #00FF41 !important;
             color: #0D1117 !important;
             box-shadow: 0 0 10px #00FF41;
+        }
+
+        .stFormSubmitButton > button {
+            background-color: #161B22 !important;
+            color: #00FF41 !important;
+            border: 1px solid #00FF41 !important;
+            border-radius: 2px !important;
+            transition: all 0.3s ease;
         }
 
         .stTextInput > div > div > input, .stTextArea > div > div > textarea {
