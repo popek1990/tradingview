@@ -278,28 +278,28 @@ if aliases:
             if variables:
                 alias_cmd += " " + " ".join(f"{{{{{v}}}}}" for v in variables)
             tv_json_raw = _json.dumps({"key": settings.sec_key, "msg": alias_cmd})
-            # Escape for safe embedding in JS string literal and HTML
+            # Escape for safe embedding in JS string literal
             tv_json_js = tv_json_raw.replace("\\", "\\\\").replace("`", "\\`").replace("$", "\\$")
-            tv_json_display = html.escape(tv_json_raw)
+            alias_cmd_display = html.escape(alias_cmd)
             components.html(f"""
             <div style="display:flex;align-items:center;gap:10px;background:#000;
                         padding:8px 12px;border-radius:5px;border:1px solid #30363D;
                         font-family:'Courier New',monospace;">
                 <span style="color:#8b949e;font-size:12px;white-space:nowrap;">TradingView Message:</span>
-                <code style="color:#00FF41;font-size:12px;flex:1;background:none;
-                      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{tv_json_display}</code>
+                <code style="color:#00FF41;font-size:13px;flex:1;background:none;
+                      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{alias_cmd_display}</code>
                 <button id="btn_{safe_name}" style="background:#161B22;color:#00FF41;border:1px solid #30363D;border-radius:3px;
                          padding:3px 12px;cursor:pointer;font-family:'Courier New',monospace;
                          font-size:11px;white-space:nowrap;transition:all .2s;"
                    onmouseover="this.style.background='#00FF41';this.style.color='#0D1117'"
-                   onmouseout="this.style.background='#161B22';this.style.color='#00FF41'">Copy</button>
+                   onmouseout="this.style.background='#161B22';this.style.color='#00FF41'">Copy JSON</button>
             </div>
             <script>
                 document.getElementById('btn_{safe_name}').addEventListener('click', function() {{
                     var btn = this;
                     navigator.clipboard.writeText(`{tv_json_js}`).then(function() {{
                         btn.innerText = 'Copied!';
-                        setTimeout(function() {{ btn.innerText = 'Copy'; }}, 1500);
+                        setTimeout(function() {{ btn.innerText = 'Copy JSON'; }}, 1500);
                     }});
                 }});
             </script>
