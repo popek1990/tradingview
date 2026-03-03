@@ -1,5 +1,8 @@
 # 🗣 TradingView Alerts to Telegram, Discord or Slack
 
+<img width="1601" height="450" alt="image" src="https://github.com/user-attachments/assets/e146193b-584a-484a-a9b1-d9aa48b62a3d" />
+
+
 A self-hosted webhook server that receives [TradingView](https://tradingview.com) alerts and forwards them to **Telegram**, **Discord**, and **Slack**. Comes with a password-protected admin dashboard for managing configuration through the browser.
 
 Built with FastAPI + Streamlit, deployed via Docker Compose.
