@@ -148,7 +148,7 @@ if not editing:
     if "new_alias_vars" not in st.session_state:
         st.session_state.new_alias_vars = ""
 
-    with st.expander("Add", expanded=False):
+    with st.expander("Add", expanded=bool(st.session_state.new_alias_vars)):
       with st.form("form_new_alias", border=True):
         new_name = st.text_input("ALIAS NAME (a-z, 0-9, _, -)", max_chars=64)
         new_template = st.text_area("TEMPLATE CONTENT", height=150, max_chars=4000,
