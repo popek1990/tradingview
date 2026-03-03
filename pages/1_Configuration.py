@@ -55,6 +55,9 @@ if submit:
     if not dashboard_password.strip():
         st.error("DASHBOARD_PASSWORD cannot be empty!")
         st.stop()
+    if len(dashboard_password.strip()) < 8:
+        st.error("DASHBOARD_PASSWORD must be at least 8 characters!")
+        st.stop()
 
     if not sec_key.strip():
         st.error("SEC_KEY cannot be empty!")

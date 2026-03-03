@@ -24,8 +24,7 @@ services:
       dockerfile: Dockerfile.streamlit
     container_name: TView_to_social-Dashboard
     ports:
-      # For Cloudflare Tunnel deployments: change to "127.0.0.1:8501:8501" for extra security
-      - "0.0.0.0:8501:8501"  # Available on LAN — protected by password (DASHBOARD_PASSWORD)
+      - "127.0.0.1:8501:8501"  # Localhost only — Cloudflare Tunnel connects locally
     environment:
       - WEBHOOK_URL=http://webhook:1990
     volumes:

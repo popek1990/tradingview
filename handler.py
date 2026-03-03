@@ -6,6 +6,7 @@
 import collections
 import logging
 import re
+import textwrap
 import threading
 from typing import Any
 from urllib.parse import urlparse
@@ -98,11 +99,15 @@ def send_alert(data: dict[str, Any]) -> dict[str, bool]:
         try:
             tg_bot = _get_tg_bot(settings.tg_token)
             channel = data.get("telegram") or settings.channel
-            group_name = _get_group_name(tg_bot, channel)
+            if not re.match(r"^-?\d+$", str(channel)):
+                logger.warning("Telegram: invalid channel ID format: rejected")
+                results["telegram"] = False
+            else:
+                group_name = _get_group_name(tg_bot, channel)
 
-            _tg_send_message(tg_bot, channel, msg)
-            logger.info("Telegram: sent to %s", group_name)
-            results["telegram"] = True
+                _tg_send_message(tg_bot, channel, msg)
+                logger.info("Telegram: sent to %s", group_name)
+                results["telegram"] = True
         except Exception as e:
             logger.error("Telegram: %s", e)
             results["telegram"] = False
@@ -142,10 +147,11 @@ def send_alert(data: dict[str, Any]) -> dict[str, bool]:
                 results["discord"] = False
             else:
                 webhook = DiscordWebhook(url=discord_url, timeout=NETWORK_TIMEOUT)
+                title = textwrap.shorten(msg, width=256, placeholder="...")
                 if len(msg) > 256:
-                    embed = DiscordEmbed(title=msg[:253] + "...", description=msg[:4096])
+                    embed = DiscordEmbed(title=title, description=msg[:4096])
                 else:
-                    embed = DiscordEmbed(title=msg)
+                    embed = DiscordEmbed(title=title)
                 webhook.add_embed(embed)
                 response = webhook.execute()
                 if response is None:

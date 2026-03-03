@@ -20,6 +20,7 @@ from ui_utils import render_ui_header, render_sidebar_info
 logger = logging.getLogger(__name__)
 
 INVALIDATED_TOKENS_FILE = Path(__file__).parent / "invalidated_tokens.json"
+IP_LOCKS_FILE = Path(__file__).parent / "logs" / "auth_locks.json"
 
 MAX_ATTEMPTS = 10
 LOCKOUT_SECONDS = 900  # 15 minutes
@@ -27,12 +28,56 @@ SESSION_PARAM = "s"  # query param name for session token
 SESSION_TTL = 14400  # 4 hours in seconds
 
 _auth_lock = threading.Lock()
+_ip_locks_lock = threading.Lock()
+
+
+def _load_ip_locks() -> dict:
+    """Loads IP lockout data from JSON file. Prunes expired entries on load."""
+    try:
+        with _ip_locks_lock:
+            data = json.loads(IP_LOCKS_FILE.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+    now = time.time()
+    return {
+        ip: info for ip, info in data.items()
+        if info.get("block_until", 0) > now or info.get("fail_count", 0) > 0
+    }
+
+
+def _save_ip_locks(locks: dict) -> None:
+    """Saves IP lockout data to JSON file atomically."""
+    import os
+    import tempfile
+    with _ip_locks_lock:
+        now = time.time()
+        clean = {
+            ip: info for ip, info in locks.items()
+            if info.get("block_until", 0) > now or info.get("fail_count", 0) > 0
+        }
+        IP_LOCKS_FILE.parent.mkdir(mode=0o750, exist_ok=True)
+        fd, tmp_path = tempfile.mkstemp(
+            dir=str(IP_LOCKS_FILE.parent), suffix=".tmp",
+        )
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump(clean, f)
+            os.replace(tmp_path, str(IP_LOCKS_FILE))
+        except Exception:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+            raise
 
 
 @st.cache_resource
 def _get_ip_locks():
-    """Per-IP failed login counters: {ip: {"fail_count": int, "block_until": float}}."""
-    return {}
+    """Per-IP failed login counters: {ip: {"fail_count": int, "block_until": float}}.
+
+    Loaded from persistent file on first access.
+    """
+    return _load_ip_locks()
 
 
 _token_lock = threading.Lock()
@@ -167,8 +212,13 @@ def _prune_expired_locks():
         ip for ip, info in ip_locks.items()
         if info["block_until"] > 0 and info["block_until"] <= now and info["fail_count"] == 0
     ]
-    for ip in expired:
-        ip_locks.pop(ip, None)
+    if expired:
+        for ip in expired:
+            ip_locks.pop(ip, None)
+        try:
+            _save_ip_locks(ip_locks)
+        except Exception as e:
+            logger.warning("Failed to persist IP locks: %s", e)
 
 
 # ── Main entry point ─────────────────────────────────────────────
@@ -257,6 +307,10 @@ def check_login():
         if hmac.compare_digest(password, secret):
             with _auth_lock:
                 ip_locks.pop(client_ip, None)
+            try:
+                _save_ip_locks(ip_locks)
+            except Exception as e:
+                logger.warning("Failed to persist IP locks: %s", e)
             new_token = _create_token(secret)
             st.session_state["session_token"] = new_token
             st.query_params[SESSION_PARAM] = new_token
@@ -273,5 +327,9 @@ def check_login():
                 else:
                     remaining = MAX_ATTEMPTS - ip_locks[client_ip]["fail_count"]
                     st.error(f"Incorrect password. Attempts remaining: {remaining}")
+            try:
+                _save_ip_locks(ip_locks)
+            except Exception as e:
+                logger.warning("Failed to persist IP locks: %s", e)
 
     st.stop()

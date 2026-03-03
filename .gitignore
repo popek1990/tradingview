@@ -106,6 +106,8 @@ celerybeat.pid
 
 # Project files
 plan.md
+plan2.md
+plan3.md
 CLAUDE.md
 GEMINI.md
 backups/

@@ -8,7 +8,7 @@ import requests
 import streamlit as st
 import streamlit.components.v1 as components
 from auth import check_login
-from aliases import load_aliases, save_aliases, validate_variable_names
+from aliases import get_lock as get_aliases_lock, load_aliases, load_aliases_unlocked, save_aliases, validate_variable_names
 
 def _check_template_vars(template: str, variables: list[str]) -> str | None:
     """Returns warning message if template placeholders don't match declared variables."""
@@ -83,7 +83,7 @@ if "just_saved_alias" not in st.session_state:
 editing = st.session_state.edit_alias
 if editing and editing in aliases:
     st.markdown(
-        f'<h3><span style="color: #00FF41;">EDITING:</span> /{editing.upper()}</h3>',
+        f'<h3><span style="color: #00FF41;">EDITING:</span> /{html.escape(editing.upper())}</h3>',
         unsafe_allow_html=True,
     )
     if st.button("CANCEL"):
@@ -118,16 +118,18 @@ if editing and editing in aliases:
             var_warning = _check_template_vars(template, parsed_vars)
             if var_warning:
                 st.warning(f"Variable mismatch: {var_warning}")
-            if name_to_save != editing:
-                if name_to_save in aliases:
-                    st.error(f"ALIAS '/{name_to_save}' ALREADY EXISTS")
-                    st.stop()
-                del aliases[editing]
-            aliases[name_to_save] = {
-                "template": template,
-                "variables": parsed_vars,
-            }
-            save_aliases(aliases)
+            with get_aliases_lock():
+                aliases = load_aliases_unlocked()
+                if name_to_save != editing:
+                    if name_to_save in aliases:
+                        st.error(f"ALIAS '/{name_to_save}' ALREADY EXISTS")
+                        st.stop()
+                    aliases.pop(editing, None)
+                aliases[name_to_save] = {
+                    "template": template,
+                    "variables": parsed_vars,
+                }
+                save_aliases(aliases)
             st.success(f"SAVED '/{name_to_save}'")
             st.session_state.edit_alias = None
             st.session_state.just_saved_alias = name_to_save
@@ -168,11 +170,13 @@ if not editing:
             var_warning = _check_template_vars(new_template, parsed_vars)
             if var_warning:
                 st.warning(f"Variable mismatch: {var_warning}")
-            aliases[name_to_save] = {
-                "template": new_template,
-                "variables": parsed_vars,
-            }
-            save_aliases(aliases)
+            with get_aliases_lock():
+                aliases = load_aliases_unlocked()
+                aliases[name_to_save] = {
+                    "template": new_template,
+                    "variables": parsed_vars,
+                }
+                save_aliases(aliases)
             st.success(f"CREATED '/{name_to_save}'")
             st.rerun()
 
@@ -224,8 +228,10 @@ if aliases:
                     c_yes, c_no = st.columns(2)
                     with c_yes:
                         if st.button("YES", key=f"ayes_{name}", use_container_width=True):
-                            del aliases[name]
-                            save_aliases(aliases)
+                            with get_aliases_lock():
+                                aliases = load_aliases_unlocked()
+                                aliases.pop(name, None)
+                                save_aliases(aliases)
                             st.session_state.confirm_delete_alias = None
                             st.rerun()
                     with c_no:

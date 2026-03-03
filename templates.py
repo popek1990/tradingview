@@ -16,7 +16,12 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 TEMPLATES_FILE_PATH = Path(__file__).parent / "templates.json"
-_lock = threading.Lock()
+_lock = threading.RLock()
+
+
+def get_lock():
+    """Returns the module lock for external read-modify-write operations."""
+    return _lock
 
 
 def load_templates() -> dict:
@@ -24,6 +29,14 @@ def load_templates() -> dict:
     try:
         with _lock:
             return json.loads(TEMPLATES_FILE_PATH.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def load_templates_unlocked() -> dict:
+    """Loads templates WITHOUT acquiring lock. Use only inside `with get_lock():`."""
+    try:
+        return json.loads(TEMPLATES_FILE_PATH.read_text(encoding="utf-8"))
     except (FileNotFoundError, json.JSONDecodeError):
         return {}
 

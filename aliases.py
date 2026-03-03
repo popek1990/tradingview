@@ -24,7 +24,12 @@ logger = logging.getLogger(__name__)
 
 ALIASES_FILE = Path(__file__).parent / "aliases.json"
 REGEX_VAR_NAME = re.compile(r"^[a-zA-Z0-9_]{1,64}$")
-_lock = threading.Lock()
+_lock = threading.RLock()
+
+
+def get_lock():
+    """Returns the module lock for external read-modify-write operations."""
+    return _lock
 
 
 def load_aliases() -> dict:
@@ -32,6 +37,14 @@ def load_aliases() -> dict:
     try:
         with _lock:
             return json.loads(ALIASES_FILE.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def load_aliases_unlocked() -> dict:
+    """Loads aliases WITHOUT acquiring lock. Use only inside `with get_lock():`."""
+    try:
+        return json.loads(ALIASES_FILE.read_text(encoding="utf-8"))
     except (FileNotFoundError, json.JSONDecodeError):
         return {}
 

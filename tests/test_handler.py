@@ -53,14 +53,14 @@ class TestSendAlert:
     def test_telegram_fallback_to_config(self, mock_bot, monkeypatch):
         """Telegram uses channel from config when no override."""
         monkeypatch.setenv("SEND_ALERTS_TELEGRAM", "True")
-        monkeypatch.setenv("CHANNEL", "-100default")
+        monkeypatch.setenv("CHANNEL", "-100999888")
         mock_instance = MagicMock()
         mock_bot.return_value = mock_instance
 
         send_alert({"msg": "test"})
 
         args = mock_instance.sendMessage.call_args
-        assert args[0][0] == "-100default"
+        assert args[0][0] == "-100999888"
 
     @patch("handler.requests.post")
     def test_slack_success(self, mock_post, monkeypatch):
