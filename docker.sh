@@ -1,19 +1,19 @@
 #!/bin/bash
 
-# Prosty skrypt do aktualizacji i przebudowy TradingView-Webhook-Bot
-# Użycie: ./docker.sh
+# Quick update & rebuild script for TradingView-Webhook-Bot
+# Usage: ./docker.sh
 
-echo "🛑 Zatrzymywanie kontenerów..."
+echo "Stopping containers..."
 docker compose down
 
-echo "📥 Pobieranie najnowszych zmian z GitHub..."
+echo "Pulling latest changes from GitHub..."
 git pull origin main
 
-echo "🏗️ Przebudowa obrazów i uruchamianie (detached)..."
+echo "Rebuilding images and starting (detached)..."
 docker compose up -d --build
 
-echo "🧹 Usuwanie nieużywanych obrazów (cleanup)..."
+echo "Cleaning up unused images..."
 docker image prune -f
 
-echo "✅ Gotowe! TradingView-Webhook-Bot został zaktualizowany i uruchomiony."
-echo "Możesz sprawdzić logi komendą: docker compose logs -f"
+echo "Done! TradingView-Webhook-Bot has been updated and started."
+echo "Check logs with: docker compose logs -f"
