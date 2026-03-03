@@ -149,18 +149,6 @@ if not editing:
         st.session_state.new_alias_vars = ""
 
     with st.expander("Add", expanded=False):
-      st.caption("Quick-add TradingView variables:")
-      pill_cols = st.columns(len(TV_PLACEHOLDERS))
-      for i, var in enumerate(TV_PLACEHOLDERS):
-          with pill_cols[i]:
-              if st.button(f"{{{{{var}}}}}", key=f"qv_{var}", use_container_width=True):
-                  current = st.session_state.new_alias_vars
-                  existing = [v.strip() for v in current.split(",") if v.strip()]
-                  if var not in existing:
-                      existing.append(var)
-                      st.session_state.new_alias_vars = ", ".join(existing)
-                      st.rerun()
-
       with st.form("form_new_alias", border=True):
         new_name = st.text_input("ALIAS NAME (a-z, 0-9, _, -)", max_chars=64)
         new_template = st.text_area("TEMPLATE CONTENT", height=150, max_chars=4000,
@@ -201,6 +189,20 @@ if not editing:
             st.success(f"CREATED '/{name_to_save}'")
             st.session_state.new_alias_vars = ""
             st.rerun()
+
+      st.caption("Quick-add TradingView variables:")
+      pill_cols = st.columns(len(TV_PLACEHOLDERS))
+      for i, var in enumerate(TV_PLACEHOLDERS):
+          with pill_cols[i]:
+              st.markdown('<div class="small-btn">', unsafe_allow_html=True)
+              if st.button(f"{{{{{var}}}}}", key=f"qv_{var}", use_container_width=True):
+                  current = st.session_state.new_alias_vars
+                  existing = [v.strip() for v in current.split(",") if v.strip()]
+                  if var not in existing:
+                      existing.append(var)
+                      st.session_state.new_alias_vars = ", ".join(existing)
+                      st.rerun()
+              st.markdown('</div>', unsafe_allow_html=True)
 
 # --- List of Aliases ---
 if aliases:
