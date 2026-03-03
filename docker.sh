@@ -9,6 +9,12 @@ docker compose down
 echo "Pulling latest changes from GitHub..."
 git pull origin main
 
+# Dashboard container runs as non-root (appuser, UID 1000).
+# .env must be writable since the dashboard saves config changes to it.
+echo "Fixing .env permissions for dashboard..."
+touch .env
+chmod 666 .env
+
 echo "Rebuilding images and starting (detached)..."
 docker compose up -d --build
 
