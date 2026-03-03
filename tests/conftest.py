@@ -3,6 +3,9 @@
 import os
 import pytest
 
+# Set ALLOWED_HOSTS before main.py is imported (read at import time)
+os.environ.setdefault("ALLOWED_HOSTS", "localhost,127.0.0.1,webhook,test,testserver")
+
 # Test settings — override env vars BEFORE importing modules
 TEST_ENV = {
     "SEC_KEY": "test_secret_key_123",
@@ -37,6 +40,7 @@ def _test_env(monkeypatch, tmp_path):
     """Sets test env vars and creates temporary .env file."""
     for key, value in TEST_ENV.items():
         monkeypatch.setenv(key, value)
+    monkeypatch.setenv("ALLOWED_HOSTS", "localhost,127.0.0.1,webhook,test,testserver")
 
     # Temporary .env (pydantic-settings reads from env vars, not file in tests)
     env_file = tmp_path / ".env"

@@ -70,12 +70,11 @@ logging.getLogger("uvicorn.access").addFilter(SecKeyFilter())
 
 # Rate limiting — use CF-Connecting-IP behind Cloudflare Tunnel
 def get_client_ip(request: Request) -> str:
-    """Gets real client IP (CF-Connecting-IP > X-Forwarded-For > client.host)."""
-    return (
-        request.headers.get("CF-Connecting-IP")
-        or request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
-        or (request.client.host if request.client else "unknown")
-    )
+    """Gets real client IP. Trusts CF-Connecting-IP (Cloudflare) or falls back to TCP peer."""
+    cf_ip = request.headers.get("CF-Connecting-IP")
+    if cf_ip:
+        return cf_ip
+    return request.client.host if request.client else "unknown"
 
 # slowapi/starlette tries to read .env by default, causing PermissionError in Docker.
 # Set a non-existent file to prevent the library from opening it.
@@ -98,6 +97,9 @@ async def lifespan(app: FastAPI):
     if not settings.sec_key:
         logger.critical("SEC_KEY is empty. Please set SEC_KEY in .env.")
         raise SystemExit(1)
+    if len(settings.sec_key) < 16:
+        logger.critical("SEC_KEY too short (%d chars, min 16). Update in .env.", len(settings.sec_key))
+        raise SystemExit(1)
             
     logger.info("Server started — SEC_KEY configured")
     yield
@@ -114,7 +116,7 @@ app = FastAPI(
 app.state.limiter = limiter
 
 # Trusted Host middleware
-_default_hosts = "localhost,127.0.0.1,webhook,test,testserver"
+_default_hosts = "localhost,127.0.0.1,webhook"
 _allowed_hosts = os.getenv("ALLOWED_HOSTS", _default_hosts).split(",")
 app.add_middleware(
     TrustedHostMiddleware,
@@ -197,7 +199,8 @@ async def _handle_webhook(request: Request, key_from_url: str | None) -> dict:
     json_data: dict = {}
     extra: dict = {}
 
-    if "application/json" in content_type:
+    ct = content_type.split(";")[0].strip().lower()
+    if ct == "application/json":
         # JSON — old format (with key) or new (without key, with template)
         try:
             json_data = await request.json()
