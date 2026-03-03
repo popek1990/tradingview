@@ -119,13 +119,12 @@ app = FastAPI(
 )
 app.state.limiter = limiter
 
-# Trusted Host middleware
-_default_hosts = "localhost,127.0.0.1,webhook"
-_allowed_hosts = os.getenv("ALLOWED_HOSTS", _default_hosts).split(",")
-app.add_middleware(
-    TrustedHostMiddleware,
-    allowed_hosts=[h.strip() for h in _allowed_hosts],
-)
+# Trusted Host middleware — defaults to "*" (allow all) for easy setup.
+# Set ALLOWED_HOSTS in .env to restrict (e.g. "yourdomain.com,localhost,webhook").
+_allowed_hosts_env = os.getenv("ALLOWED_HOSTS", "")
+if _allowed_hosts_env.strip():
+    _allowed_hosts = [h.strip() for h in _allowed_hosts_env.split(",")]
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=_allowed_hosts)
 
 
 # Body size limit (max 10KB) — checks actual body, not just Content-Length header
