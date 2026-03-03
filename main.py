@@ -9,6 +9,9 @@ import hmac
 import ipaddress
 import json
 import logging
+
+from dotenv import load_dotenv
+load_dotenv()  # Load .env into os.environ (needed for ALLOWED_HOSTS etc.)
 import logging.handlers
 import os
 import uuid
