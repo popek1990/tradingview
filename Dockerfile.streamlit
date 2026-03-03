@@ -12,6 +12,7 @@ COPY .streamlit/ ./.streamlit/
 
 # Non-root user (principle of least privilege)
 RUN groupadd -g 1000 appgrp && useradd -u 1000 -g appgrp appuser \
+    && mkdir -p /usr/src/app/data \
     && chown -R appuser:appgrp /usr/src/app
 USER appuser
 
