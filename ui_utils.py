@@ -1,4 +1,5 @@
 import html
+import logging
 import os
 
 import requests
@@ -6,6 +7,8 @@ import streamlit as st
 from dotenv import set_key
 
 from config import Settings
+
+logger = logging.getLogger(__name__)
 
 # Shared constants — single source of truth for frontend
 WEBHOOK_URL = os.getenv("WEBHOOK_URL", "http://localhost:80")
@@ -52,6 +55,9 @@ def save_and_reload(fields: dict) -> None:
         st.error(f"WRITE FAILED: {', '.join(write_errors)}")
         st.stop()
 
+    # Audit log — record which keys were changed (not the values)
+    logger.info("Dashboard config change: updated keys [%s]", ", ".join(fields.keys()))
+
     st.success("CONFIGURATION PERSISTED TO .ENV")
     st.toast("Persisted!")
 
@@ -75,6 +81,9 @@ def safe_html(text: str) -> str:
 
 def render_ui_header():
     """Renders shared header and injects global CSS Matrix Style."""
+
+    # Prevent token leakage via Referer header
+    st.markdown('<meta name="referrer" content="no-referrer">', unsafe_allow_html=True)
 
     # Global CSS Matrix/Minimalist
     st.markdown("""
@@ -201,11 +210,11 @@ def render_sidebar_info():
         st.markdown(
             '<div style="margin-top: 4px; font-size: 11px; font-family: monospace; color: #484F58;">'
             '\U0001f517 <code style="color: #00FF41;">Github:</code> '
-            '<a href="https://github.com/popek1990/Tradingview" target="_blank" '
+            '<a href="https://github.com/popek1990/Tradingview" target="_blank" rel="noreferrer noopener" '
             'style="color: #484F58; text-decoration: underline; text-underline-offset: 3px;">'
             'popek1990/Tradingview</a><br><br>'
             '\U0001f517 <code style="color: #00FF41;">Twitter:</code> '
-            '<a href="https://x.com/popek_1990" target="_blank" '
+            '<a href="https://x.com/popek_1990" target="_blank" rel="noreferrer noopener" '
             'style="color: #484F58; text-decoration: underline; text-underline-offset: 3px;">'
             '@popek_1990</a></div>',
             unsafe_allow_html=True,

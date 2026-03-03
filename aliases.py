@@ -14,7 +14,9 @@ so the webhook receives: /spot 1INCHUSDT BINANCE 0.0964
 
 import json
 import logging
+import os
 import re
+import tempfile
 import threading
 from pathlib import Path
 
@@ -45,12 +47,21 @@ def validate_variable_names(variables: list[str]) -> None:
 
 
 def save_aliases(aliases: dict) -> None:
-    """Saves aliases to JSON file."""
+    """Saves aliases to JSON file atomically (tempfile + os.replace)."""
     with _lock:
-        ALIASES_FILE.write_text(
-            json.dumps(aliases, ensure_ascii=False, indent=2),
-            encoding="utf-8",
+        fd, tmp_path = tempfile.mkstemp(
+            dir=str(ALIASES_FILE.parent), suffix=".tmp",
         )
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump(aliases, f, ensure_ascii=False, indent=2)
+            os.replace(tmp_path, str(ALIASES_FILE))
+        except Exception:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+            raise
     logger.info("Aliases saved (%d aliases)", len(aliases))
 
 

@@ -9,6 +9,20 @@ import streamlit as st
 import streamlit.components.v1 as components
 from auth import check_login
 from aliases import load_aliases, save_aliases, validate_variable_names
+
+def _check_template_vars(template: str, variables: list[str]) -> str | None:
+    """Returns warning message if template placeholders don't match declared variables."""
+    import re
+    placeholders = set(re.findall(r"\{(\w+)\}", template))
+    declared = set(variables)
+    unused = declared - placeholders
+    undeclared = placeholders - declared
+    warnings = []
+    if unused:
+        warnings.append(f"Declared but unused in template: {', '.join(sorted(unused))}")
+    if undeclared:
+        warnings.append(f"Used in template but not declared: {', '.join(sorted(undeclared))}")
+    return "; ".join(warnings) if warnings else None
 from config import Settings
 from ui_utils import WEBHOOK_URL
 
@@ -101,6 +115,9 @@ if editing and editing in aliases:
             except ValueError as e:
                 st.error(str(e))
                 st.stop()
+            var_warning = _check_template_vars(template, parsed_vars)
+            if var_warning:
+                st.warning(f"Variable mismatch: {var_warning}")
             if name_to_save != editing:
                 if name_to_save in aliases:
                     st.error(f"ALIAS '/{name_to_save}' ALREADY EXISTS")
@@ -148,6 +165,9 @@ if not editing:
             except ValueError as e:
                 st.error(str(e))
                 st.stop()
+            var_warning = _check_template_vars(new_template, parsed_vars)
+            if var_warning:
+                st.warning(f"Variable mismatch: {var_warning}")
             aliases[name_to_save] = {
                 "template": new_template,
                 "variables": parsed_vars,

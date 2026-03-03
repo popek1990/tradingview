@@ -140,27 +140,9 @@ Rent a VPS ([Hetzner](https://www.hetzner.com/cloud), [DigitalOcean](https://www
 
 ## Setting Up TradingView Alerts
 
-### Method 1: Alias (recommended)
+### Method 1: JSON payload (recommended)
 
-Aliases let you use short commands instead of JSON. Define them in the dashboard under **Aliases**, then use them in TradingView's alert **Message** field:
-
-```
-/spot {{ticker}} {{exchange}} {{close}}
-```
-
-![Alias in TradingView Message field](alias_example.png)
-
-TradingView substitutes `{{ticker}}`, `{{exchange}}`, `{{close}}` with real values before sending. The webhook receives something like `/spot BTCUSDT BINANCE 68000` and expands it using the alias template.
-
-![Alias output in Telegram](alias_output_example.png)
-
-**Webhook URL setup:**
-- Set the URL to: `http://yourdomain.com/webhook/your_secret_key`
-- The key is passed in the URL, so the message field only needs the alias command
-
-### Method 2: JSON payload
-
-Set webhook URL to `http://yourdomain.com/webhook` and the message to:
+Set webhook URL to `https://yourdomain.com/webhook` and the message to:
 
 ```json
 {
@@ -168,6 +150,27 @@ Set webhook URL to `http://yourdomain.com/webhook` and the message to:
   "msg": "Signal *#{{ticker}}* at price `{{close}}`"
 }
 ```
+
+This is the **preferred method** — the key stays in the POST body and never appears in URLs or access logs.
+
+### Method 2: Alias with JSON body (recommended for aliases)
+
+Aliases let you use short commands instead of complex JSON. Define them in the dashboard under **Aliases**, then use them in TradingView:
+
+**Webhook URL:** `https://yourdomain.com/webhook`
+
+**Message:**
+```json
+{
+  "key": "your_secret_key",
+  "msg": "/spot {{ticker}} {{exchange}} {{close}}"
+}
+```
+
+TradingView substitutes `{{ticker}}`, `{{exchange}}`, `{{close}}` with real values before sending. The webhook receives something like `/spot BTCUSDT BINANCE 68000` and expands it using the alias template.
+
+![Alias in TradingView Message field](alias_example.png)
+![Alias output in Telegram](alias_output_example.png)
 
 ### Method 3: JSON with channel override
 
@@ -183,14 +186,24 @@ Override default channels per alert:
 }
 ```
 
+### Method 4: Key in URL (deprecated, backwards compatible)
+
+> **Deprecated:** This method exposes the key in the URL path, which may appear in access logs. Use Method 1 or 2 instead. This endpoint will be removed in a future version.
+
+Set webhook URL to `https://yourdomain.com/webhook/your_secret_key` and the message to plain text:
+
+```
+/spot {{ticker}} {{exchange}} {{close}}
+```
+
 ---
 
 ## API Endpoints
 
 | Endpoint | Method | Description |
 |---|---|---|
-| `/webhook` | POST | Receive alerts (key in JSON body) |
-| `/webhook/{key}` | POST | Receive alerts (key in URL) |
+| `/webhook` | POST | Receive alerts (key in JSON body) — **recommended** |
+| `/webhook/{key}` | POST | Receive alerts (key in URL) — **deprecated** |
 | `/health` | GET | Health check |
 | `/reload-config` | POST | Hot-reload settings from `.env` (internal network only) |
 

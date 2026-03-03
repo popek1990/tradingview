@@ -10,6 +10,7 @@ import ipaddress
 import logging
 import logging.handlers
 import os
+import uuid
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Path, Request, HTTPException
@@ -28,7 +29,7 @@ from templates import render
 LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 LOG_DATEFMT = "%Y-%m-%d %H:%M:%S"
 LOG_FILE_PATH = "logs/webhook.log"
-os.makedirs("logs", exist_ok=True)
+os.makedirs("logs", mode=0o750, exist_ok=True)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -42,6 +43,30 @@ logging.basicConfig(
     ],
 )
 logger = logging.getLogger(__name__)
+
+
+class SecKeyFilter(logging.Filter):
+    """Masks webhook keys in URL paths: /webhook/ANYTHING → /webhook/***."""
+
+    import re as _re
+    _PATTERN = _re.compile(r"/webhook/[^/\s?#]+")
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if hasattr(record, "msg") and isinstance(record.msg, str):
+            record.msg = self._PATTERN.sub("/webhook/***", record.msg)
+        if hasattr(record, "args") and record.args:
+            if isinstance(record.args, tuple):
+                record.args = tuple(
+                    self._PATTERN.sub("/webhook/***", a) if isinstance(a, str) else a
+                    for a in record.args
+                )
+        return True
+
+
+# Apply SecKeyFilter to root logger so all access logs get masked
+logging.getLogger().addFilter(SecKeyFilter())
+# Also apply to uvicorn access logger
+logging.getLogger("uvicorn.access").addFilter(SecKeyFilter())
 
 # Rate limiting — use CF-Connecting-IP behind Cloudflare Tunnel
 def get_client_ip(request: Request) -> str:
@@ -117,6 +142,16 @@ async def limit_body_size(request: Request, call_next):
             return JSONResponse(status_code=413, content={"detail": "Payload too large"})
 
     return await call_next(request)
+
+
+# Request-ID middleware — adds unique ID to each request for log correlation
+@app.middleware("http")
+async def request_id_middleware(request: Request, call_next):
+    request_id = str(uuid.uuid4())[:8]
+    request.state.request_id = request_id
+    response = await call_next(request)
+    response.headers["X-Request-ID"] = request_id
+    return response
 
 
 # Security headers
@@ -210,16 +245,16 @@ async def _handle_webhook(request: Request, key_from_url: str | None) -> dict:
             if alias_result is not None:
                 msg = alias_result
         except (KeyError, ValueError) as e:
-            raise HTTPException(status_code=400, detail=str(e))
+            logger.warning("Alias error from %s: %s", get_client_ip(request), e)
+            raise HTTPException(status_code=400, detail="Invalid request")
 
     # Template handling
     if template_name:
         try:
             msg = render(template_name, json_data)
-        except KeyError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
+        except (KeyError, ValueError) as e:
+            logger.warning("Template error from %s: %s", get_client_ip(request), e)
+            raise HTTPException(status_code=400, detail="Invalid request")
 
     # Validation — msg must exist (from body, template, or JSON)
     if not msg:
@@ -256,7 +291,11 @@ async def webhook(request: Request):
 @app.post("/webhook/{key}")
 @limiter.limit("30/minute")
 async def webhook_with_key(request: Request, key: str = Path(..., max_length=256)):
-    """Webhook endpoint — key in URL, body as JSON or plain text."""
+    """Webhook endpoint — key in URL (deprecated), body as JSON or plain text."""
+    logger.warning(
+        "DEPRECATED: key in URL path from %s — use POST /webhook with key in JSON body",
+        get_client_ip(request),
+    )
     return await _handle_webhook(request, key_from_url=key)
 
 

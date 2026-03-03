@@ -56,7 +56,10 @@ if submit:
         st.error("DASHBOARD_PASSWORD cannot be empty!")
         st.stop()
 
-    if sec_key.strip() and len(sec_key.strip()) < 16:
+    if not sec_key.strip():
+        st.error("SEC_KEY cannot be empty!")
+        st.stop()
+    if len(sec_key.strip()) < 16:
         st.error("SEC_KEY must be at least 16 characters!")
         st.stop()
 
