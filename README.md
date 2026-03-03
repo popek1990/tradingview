@@ -63,35 +63,61 @@ cd Tradingview
 
 ```bash
 cp .env.example .env
+nano .env
 ```
 
-Edit `.env` with your values:
+Fill in your credentials:
 
 ```env
-SEC_KEY=your_secret_key_here          # Must match "key" in TradingView alerts
-DASHBOARD_PASSWORD=your_password      # Password for the admin dashboard
+# ── Security ──────────────────────────────────────────────────────
+# SEC_KEY — must match the "key" field in your TradingView alert JSON.
+# Min 16 chars. Generate one with: python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+SEC_KEY=your_secret_key_here
 
-# Telegram (get token from @BotFather)
+# DASHBOARD_PASSWORD — password to log into the admin panel (min 8 chars).
+# If your password contains special characters (& $ ! # etc.), wrap it in single quotes.
+DASHBOARD_PASSWORD='your_password_here'
+
+# ── Telegram ──────────────────────────────────────────────────────
+# 1. Open Telegram → search for @BotFather → send /newbot → follow prompts
+# 2. Copy the token (e.g. 110201543:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw)
+# 3. Add the bot to your group and send any message there
+# 4. The bot will auto-detect your groups in the Dashboard → Channels page
 SEND_ALERTS_TELEGRAM=True
 TG_TOKEN=123456789:ABCdefGHIjklMNOpqrSTUvwxYZ
-CHANNEL=-10018645640
+CHANNEL=-1001234567890
+SEND_ALERTS_TELEGRAM_2=False
+CHANNEL_2=
 
-# Discord (optional)
+# ── Discord (optional) ───────────────────────────────────────────
+# 1. Open Discord → right-click your channel → Edit Channel
+# 2. Go to Integrations → Webhooks → New Webhook
+# 3. Name it (e.g. "TradingView Alerts") and click "Copy Webhook URL"
+# URL format: https://discord.com/api/webhooks/{id}/{token}
 SEND_ALERTS_DISCORD=False
-DISCORD_WEBHOOK=https://discord.com/api/webhooks/...
+DISCORD_WEBHOOK=https://discord.com/api/webhooks/1234567890/abcdefg
 
-# Slack (optional)
+# ── Slack (optional) ─────────────────────────────────────────────
+# 1. Go to https://api.slack.com/apps → Create New App → From scratch
+# 2. Enable Incoming Webhooks → Add New Webhook to Workspace
+# 3. Pick a channel and copy the Webhook URL
+# URL format: https://hooks.slack.com/services/T.../B.../XXX
 SEND_ALERTS_SLACK=False
-SLACK_WEBHOOK=https://hooks.slack.com/services/...
+SLACK_WEBHOOK=
 ```
 
-> **Tip:** Generate a secure key: `python3 -c "import secrets; print(secrets.token_urlsafe(32))"`
+> **Note:** Telegram tokens (`TG_TOKEN`) don't need quotes — they only contain safe characters (`0-9`, `A-Z`, `a-z`, `:`, `-`, `_`).
 
-### 3. Start with Docker Compose
+### 3. Build and run
 
 ```bash
-docker compose up -d --build
+chmod +x docker.sh
+./docker.sh
 ```
+
+This script pulls the latest code, rebuilds both containers, and starts them.
+
+> Or manually: `docker compose up -d --build`
 
 After launch:
 - **Webhook:** `http://localhost:80` (needs to be publicly accessible for TradingView)
@@ -99,7 +125,9 @@ After launch:
 
 ---
 
-## Getting a Telegram Bot Token
+## Getting Credentials
+
+### Telegram Bot Token (`TG_TOKEN`)
 
 1. Open Telegram and search for **@BotFather**
 2. Send `/newbot` and follow the prompts (choose a name and username)
@@ -107,6 +135,21 @@ After launch:
 4. Paste this token as `TG_TOKEN` in your `.env`
 5. **Add the bot to your Telegram group** and send any message there
 6. Go to the **Channels** page in the admin dashboard — the bot will auto-detect your groups
+
+### Discord Webhook (`DISCORD_WEBHOOK`)
+
+1. Open **Discord** and go to your server
+2. Right-click the channel you want alerts in → **Edit Channel**
+3. Go to **Integrations** → **Webhooks** → **New Webhook**
+4. Name it (e.g. "TradingView Alerts"), pick the channel
+5. Click **Copy Webhook URL** and paste it as `DISCORD_WEBHOOK` in your `.env`
+
+### Slack Webhook (`SLACK_WEBHOOK`)
+
+1. Go to [api.slack.com/apps](https://api.slack.com/apps) → **Create New App** → **From scratch**
+2. Go to **Incoming Webhooks** → toggle **On**
+3. Click **Add New Webhook to Workspace** → pick a channel → **Allow**
+4. Copy the Webhook URL and paste it as `SLACK_WEBHOOK` in your `.env`
 
 ---
 
