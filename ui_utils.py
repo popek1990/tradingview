@@ -1,10 +1,10 @@
 import html
 import logging
 import os
+import re
 
 import requests
 import streamlit as st
-from dotenv import set_key
 
 from config import Settings
 
@@ -13,6 +13,44 @@ logger = logging.getLogger(__name__)
 # Shared constants — single source of truth for frontend
 WEBHOOK_URL = os.getenv("WEBHOOK_URL", "http://localhost:80")
 ENV_FILE_PATH = ".env"
+
+
+def _set_env_key(filepath: str, key: str, value: str) -> bool:
+    """Write a key=value to .env file (in-place, no atomic replace).
+
+    python-dotenv's set_key() uses tempfile + os.replace() which fails
+    on Docker bind-mounted files (OSError: Device or resource busy).
+    This writes directly to the file to avoid that issue.
+    """
+    try:
+        lines = []
+        found = False
+        if os.path.exists(filepath):
+            with open(filepath, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+
+        # Quote value if it contains special shell characters
+        needs_quoting = any(c in value for c in " &$!#\"'\\`|;(){}[]<>")
+        quoted = f"'{value}'" if needs_quoting and value else value
+
+        new_line = f"{key}={quoted}\n"
+        pattern = re.compile(rf"^{re.escape(key)}=")
+
+        for i, line in enumerate(lines):
+            if pattern.match(line):
+                lines[i] = new_line
+                found = True
+                break
+
+        if not found:
+            lines.append(new_line)
+
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.writelines(lines)
+        return True
+    except Exception as exc:
+        logger.error("Failed to write %s to %s: %s", key, filepath, exc)
+        return False
 
 
 @st.cache_data(ttl=30)
@@ -47,8 +85,7 @@ def save_and_reload(fields: dict) -> None:
 
     write_errors = []
     for key, value in fields.items():
-        success, _, _ = set_key(ENV_FILE_PATH, key, value)
-        if not success:
+        if not _set_env_key(ENV_FILE_PATH, key, value):
             write_errors.append(key)
 
     if write_errors:
