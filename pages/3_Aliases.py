@@ -211,7 +211,8 @@ if aliases:
         just_saved = st.session_state.just_saved_alias == name
         if just_saved:
             st.session_state.just_saved_alias = None
-        with st.expander(f"/`{name.upper()}`", expanded=just_saved):
+        keep_open = just_saved or st.session_state.confirm_delete_alias == name
+        with st.expander(f"/`{name.upper()}`", expanded=keep_open):
             col_preview, col_controls = st.columns([5, 1])
             with col_preview:
                 variables = data.get("variables", [])
