@@ -10,8 +10,8 @@ COPY main.py handler.py config.py templates.py aliases.py ./
 
 # Non-root user (principle of least privilege)
 RUN groupadd -g 1000 appgrp && useradd -u 1000 -g appgrp appuser \
-    && mkdir -p /usr/src/app/logs \
-    && chown -R appuser:appgrp /usr/src/app/logs
+    && mkdir -p /usr/src/app/logs /usr/src/app/data \
+    && chown -R appuser:appgrp /usr/src/app/logs /usr/src/app/data
 USER appuser
 
 EXPOSE 1990

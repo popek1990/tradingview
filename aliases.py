@@ -20,7 +20,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-ALIASES_FILE = Path(__file__).parent / "aliases.json"
+ALIASES_FILE = Path(__file__).parent / "data" / "aliases.json"
 REGEX_VAR_NAME = re.compile(r"^[a-zA-Z0-9_]{1,64}$")
 _lock = threading.RLock()
 
