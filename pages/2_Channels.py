@@ -1,13 +1,14 @@
 """Channels Configuration — Minimalist Terminal Style."""
 
+import re
+
 import streamlit as st
-from telegram import Bot
 from auth import check_login
 from config import Settings
 from ui_utils import save_and_reload
 
 # Must be first Streamlit command
-st.set_page_config(page_title="TradingView Alerts", page_icon="📡", layout="wide")
+st.set_page_config(page_title="TradingView Alerts", page_icon="viking_logo.jpg", layout="wide")
 
 check_login()
 
@@ -16,73 +17,33 @@ settings = Settings()
 
 st.subheader("NOTIFICATION CHANNELS")
 
-# --- Telegram Scanner ---
-if "found_groups" not in st.session_state:
-    st.session_state.found_groups = {}
-
-with st.expander("TG NETWORK SCANNER", expanded=False):
-    col_scan, col_info = st.columns([1, 2])
-    with col_scan:
-        if st.button("RUN SCAN", use_container_width=True):
-            if not settings.tg_token: st.error("MISSING TG_TOKEN!")
-            else:
-                try:
-                    bot = Bot(token=settings.tg_token)
-                    bot_info = bot.get_me()
-                    st.info(f"CONNECTED: @{bot_info.username}")
-                    updates = bot.get_updates(timeout=10, allowed_updates=["message", "channel_post", "my_chat_member"])
-                    groups = {}
-                    for u in updates:
-                        chat = u.message.chat if u.message else (u.channel_post.chat if u.channel_post else (u.my_chat_member.chat if u.my_chat_member else None))
-                        if chat and chat.type in ["group", "supergroup", "channel"]:
-                            groups[str(chat.id)] = chat.title or chat.username or str(chat.id)
-                    if not groups: st.warning("NO NODES FOUND")
-                    else:
-                        st.session_state.found_groups.update(groups)
-                        st.success(f"FOUND {len(groups)} NODES")
-                except Exception as e: st.error(f"SCAN ERROR: {e}")
-    with col_info:
-        st.caption(f"Status: {len(st.session_state.found_groups)} nodes cached.")
-
-# Helper for group selection
-def render_group_selector(label, current_value, key_prefix):
-    options = {"[ MANUAL ENTRY ]": None}
-    selectbox_options = ["[ MANUAL ENTRY ]"]
-    current_in_list = False
-    for gid, gtitle in st.session_state.found_groups.items():
-        label_opt = f"{gtitle} ({gid})"
-        options[label_opt] = gid
-        selectbox_options.append(label_opt)
-        if str(gid) == str(current_value): current_in_list = True
-    index = 0
-    if current_in_list:
-        for i, opt in enumerate(selectbox_options):
-            if options[opt] == str(current_value):
-                index = i; break
-    selection = st.selectbox(f"{label} Target", options=selectbox_options, index=index, key=f"{key_prefix}_select")
-    if selection == "[ MANUAL ENTRY ]":
-        return st.text_input(f"ID: {label} (Manual)", value=current_value, key=f"{key_prefix}_input")
-    else:
-        val = options[selection]
-        st.text_input(f"ID: {label} (Selected)", value=val, disabled=True, key=f"{key_prefix}_disabled")
-        return val
+# --- How to get Telegram Chat ID ---
+with st.expander("HOW TO GET TELEGRAM CHAT ID", expanded=False):
+    st.markdown("**1.** Open Telegram and search for **@ShowJsonBot**")
+    st.markdown("**2.** Add **@ShowJsonBot** to your group/channel")
+    st.markdown("**3.** The bot will instantly reply with JSON — find `\"chat\"` → `\"id\"`:")
+    st.code('{\n  "my_chat_member": {\n    "chat": {\n      "id": -5112822251,   ← THIS IS YOUR CHAT ID\n      "title": "your-group-name",\n      "type": "group"\n    }\n  }\n}', language="json")
+    st.markdown("**4.** Copy the `id` value (e.g. `-5112822251`) and paste it below")
 
 with st.form("form_channels", border=True):
     col_tg1, col_tg2 = st.columns(2)
     with col_tg1:
         st.markdown("#### TELEGRAM GROUP 1")
         tg_enabled = st.toggle("ENABLE", value=settings.send_alerts_telegram, key="tg1_toggle")
-        channel = render_group_selector("Group 1", settings.channel, "grp1")
+        channel = st.text_input("Chat ID", value=settings.channel, key="grp1_input",
+                                help="Paste the chat ID from @ShowJsonBot")
     with col_tg2:
         st.markdown("#### TELEGRAM GROUP 2")
         tg_enabled_2 = st.toggle("ENABLE", value=settings.send_alerts_telegram_2, key="tg2_toggle")
-        channel_2 = render_group_selector("Group 2", settings.channel_2, "grp2")
+        channel_2 = st.text_input("Chat ID", value=settings.channel_2, key="grp2_input",
+                                  help="Paste the chat ID from @ShowJsonBot")
 
     st.markdown("---")
     # Toggle on/off only — secrets (webhook URL) editable only in Configuration
     col_dc, col_sl = st.columns(2)
     with col_dc:
         st.markdown("#### DISCORD")
+        st.caption("⚠️ Experimental — not yet tested")
         dc_has_webhook = bool(settings.discord_webhook)
         dc_enabled = st.toggle("ENABLE", value=settings.send_alerts_discord and dc_has_webhook,
                                disabled=not dc_has_webhook, key="dc_toggle")
@@ -92,6 +53,7 @@ with st.form("form_channels", border=True):
             st.warning("Webhook: NOT SET (configure in Configuration page)")
     with col_sl:
         st.markdown("#### SLACK")
+        st.caption("⚠️ Experimental — not yet tested")
         sl_has_webhook = bool(settings.slack_webhook)
         sl_enabled = st.toggle("ENABLE", value=settings.send_alerts_slack and sl_has_webhook,
                                disabled=not sl_has_webhook, key="sl_toggle")
@@ -103,12 +65,19 @@ with st.form("form_channels", border=True):
     submit = st.form_submit_button("PERSIST CHANNEL SETTINGS", use_container_width=True)
 
 if submit:
+    # Validate Telegram Chat IDs (must be numeric, negative for groups)
+    for label, val in [("Channel 1", channel), ("Channel 2", channel_2)]:
+        val = val.strip()
+        if val and not re.match(r"^-?\d+$", val):
+            st.error(f"{label}: Chat ID must be numeric (e.g. -5112822251)")
+            st.stop()
+
     # Only toggles and TG channels — no webhook URL overwriting
     fields = {
         "SEND_ALERTS_TELEGRAM": str(tg_enabled),
         "SEND_ALERTS_TELEGRAM_2": str(tg_enabled_2),
-        "CHANNEL": channel,
-        "CHANNEL_2": channel_2,
+        "CHANNEL": channel.strip(),
+        "CHANNEL_2": channel_2.strip(),
         "SEND_ALERTS_DISCORD": str(dc_enabled),
         "SEND_ALERTS_SLACK": str(sl_enabled),
     }

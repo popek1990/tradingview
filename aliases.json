@@ -1,6 +1,6 @@
 {
   "spot": {
     "variables": ["ticker", "exchange", "close"],
-    "template": "🎯 *Target* #{ticker} na giełdzie *{exchange}* ✔️\n\n🎯 *${ticker}* osiągnęło cenę *{close}* ✔️\n\n_...Popek, trzymaj się strategi! Zaplanowałeś to dawno. Zrób to!_"
+    "template": "🎯 *Target* #{ticker} on *{exchange}* ✔️\n\n🎯 *${ticker}* reached price *{close}* ✔️\n\n_...Popek, stay disciplined! You planned this. Execute!_"
   }
 }

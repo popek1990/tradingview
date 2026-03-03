@@ -166,12 +166,6 @@ def render_ui_header():
         else:
             pass
     with c2:
-        st.markdown(f"""
-            <div style="padding-top: 5px;">
-                <h1 style="margin: 0; font-size: 28px;">TradingView Alerts to Discord, Telegram or Slack</h1>
-            </div>
-        """, unsafe_allow_html=True)
-
         # Status dots
         stats = check_system_status()
         s_tg = "🟢" if stats["tg"] else "🔴"
@@ -187,12 +181,15 @@ def render_ui_header():
         t_srv = "Server: Online" if stats["srv"] else "Server: Offline/Connection Error"
 
         st.markdown(f"""
-            <div style="font-size: 13px; opacity: 0.9; margin-top: 5px; margin-bottom: 10px;">
-                <span title="{safe_html(t_srv)}" class="status-dot">{s_srv} Webhook Server</span> |
-                <span title="{safe_html(t_key)}" class="status-dot">{s_key} Auth Key</span> |
-                <span title="{safe_html(t_tg)}" class="status-dot">{s_tg} Telegram</span> |
-                <span title="{safe_html(t_dc)}" class="status-dot">{s_dc} Discord</span> |
-                <span title="{safe_html(t_sl)}" class="status-dot">{s_sl} Slack</span>
+            <div style="display: flex; flex-direction: column; justify-content: center; height: 80px;">
+                <h1 style="margin: 0; font-size: 28px; line-height: 1.2;">TradingView Alerts to Discord, Telegram or Slack</h1>
+                <div style="font-size: 13px; opacity: 0.9; margin-top: 4px;">
+                    <span title="{safe_html(t_srv)}" class="status-dot">{s_srv} Webhook Server</span> |
+                    <span title="{safe_html(t_key)}" class="status-dot">{s_key} Auth Key</span> |
+                    <span title="{safe_html(t_tg)}" class="status-dot">{s_tg} Telegram</span> |
+                    <span title="{safe_html(t_dc)}" class="status-dot">{s_dc} Discord</span> |
+                    <span title="{safe_html(t_sl)}" class="status-dot">{s_sl} Slack</span>
+                </div>
             </div>
         """, unsafe_allow_html=True)
     st.markdown("---")
@@ -201,18 +198,15 @@ def render_ui_header():
 def render_sidebar_info():
     """Displays additional info in sidebar."""
     with st.sidebar:
-        st.markdown("---")
         st.markdown(
-            '<div style="font-size: 11px; color: #484F58; font-family: monospace;">'
-            'SYSTEM: <code>POPEK-LAB-CORE</code><br>'
-            'KERNEL: <code>3.12-DOCKER</code><br>'
-            'UPTIME: <code>ACTIVE</code></div>',
-            unsafe_allow_html=True,
-        )
-        st.markdown(
-            '<div style="text-align: center; margin-top: 8px;">'
+            '<div style="margin-top: 4px; font-size: 11px; font-family: monospace; color: #484F58;">'
+            '\U0001f517 <code style="color: #00FF41;">Github:</code> '
             '<a href="https://github.com/popek1990/Tradingview" target="_blank" '
-            'style="font-size: 11px; color: #484F58; text-decoration: none;">'
-            '\U0001f517 GitHub Repository</a></div>',
+            'style="color: #484F58; text-decoration: underline; text-underline-offset: 3px;">'
+            'popek1990/Tradingview</a><br><br>'
+            '\U0001f517 <code style="color: #00FF41;">Twitter:</code> '
+            '<a href="https://x.com/popek_1990" target="_blank" '
+            'style="color: #484F58; text-decoration: underline; text-underline-offset: 3px;">'
+            '@popek_1990</a></div>',
             unsafe_allow_html=True,
         )

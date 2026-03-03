@@ -14,12 +14,14 @@ so the webhook receives: /spot 1INCHUSDT BINANCE 0.0964
 
 import json
 import logging
+import re
 import threading
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
 ALIASES_FILE = Path(__file__).parent / "aliases.json"
+REGEX_VAR_NAME = re.compile(r"^[a-zA-Z0-9_]{1,64}$")
 _lock = threading.Lock()
 
 
@@ -30,6 +32,16 @@ def load_aliases() -> dict:
             return json.loads(ALIASES_FILE.read_text(encoding="utf-8"))
     except (FileNotFoundError, json.JSONDecodeError):
         return {}
+
+
+def validate_variable_names(variables: list[str]) -> None:
+    """Validates variable names (alphanumeric + underscore only).
+
+    Raises ValueError if any name is invalid.
+    """
+    for v in variables:
+        if not REGEX_VAR_NAME.match(v):
+            raise ValueError(f"Invalid variable name: '{v}' (use a-z, A-Z, 0-9, _)")
 
 
 def save_aliases(aliases: dict) -> None:
@@ -65,6 +77,8 @@ def parse_alias(text: str) -> str | None:
         raise KeyError(f"Unknown alias: /{alias_name}")
 
     alias_def = aliases[alias_name]
+    if "template" not in alias_def:
+        raise ValueError(f"Alias /{alias_name} is malformed (missing 'template' key)")
     variables = alias_def.get("variables", [])
     template = alias_def["template"]
 
@@ -74,8 +88,12 @@ def parse_alias(text: str) -> str | None:
             f"({', '.join(variables)}), got {len(args)}"
         )
 
-    result = template
-    for var_name, var_value in zip(variables, args):
-        result = result.replace(f"{{{var_name}}}", var_value)
+    # Simultaneous replacement — prevents variable value injection
+    # (e.g., ticker="{exchange}" won't affect the {exchange} placeholder)
+    replacements = {f"{{{v}}}": a for v, a in zip(variables, args)}
+    if not replacements:
+        return template
+    pattern = "|".join(re.escape(k) for k in replacements)
+    result = re.sub(pattern, lambda m: replacements[m.group(0)], template)
 
     return result

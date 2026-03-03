@@ -6,9 +6,14 @@ WORKDIR /usr/src/app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY Dashboard.py auth.py config.py templates.py aliases.py ui_utils.py viking_logo.jpg ./
+COPY Dashboard.py auth.py config.py templates.py aliases.py ui_utils.py viking_logo.jpg alias_example.png alias_output_example.png ./
 COPY pages/ ./pages/
 COPY .streamlit/ ./.streamlit/
+
+# Non-root user (principle of least privilege)
+RUN groupadd -g 1000 appgrp && useradd -u 1000 -g appgrp appuser \
+    && chown -R appuser:appgrp /usr/src/app
+USER appuser
 
 EXPOSE 8501
 
