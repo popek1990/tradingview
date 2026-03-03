@@ -71,7 +71,7 @@ DASHBOARD_PASSWORD=your_password      # Password for the admin dashboard
 # Telegram (get token from @BotFather)
 SEND_ALERTS_TELEGRAM=True
 TG_TOKEN=123456789:ABCdefGHIjklMNOpqrSTUvwxYZ
-CHANNEL=-1001234567890
+CHANNEL=-10018645640
 
 # Discord (optional)
 SEND_ALERTS_DISCORD=False
@@ -177,7 +177,7 @@ Override default channels per alert:
 {
   "key": "your_secret_key",
   "msg": "VIP alert: {{ticker}} at {{close}}",
-  "telegram": "-100123456789",
+  "telegram": "-10018645640",
   "discord": "https://discord.com/api/webhooks/...",
   "slack": "T00000000/B00000000/XXXXXXXXXXXXX"
 }
