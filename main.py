@@ -7,6 +7,7 @@ import asyncio
 import hashlib
 import hmac
 import ipaddress
+import json
 import logging
 import logging.handlers
 import os
@@ -199,11 +200,22 @@ async def _handle_webhook(request: Request, key_from_url: str | None) -> dict:
     json_data: dict = {}
     extra: dict = {}
 
+    # Read body once
+    try:
+        body = await request.body()
+        raw = body.decode("utf-8").strip()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Cannot read body")
+
+    # TradingView sometimes sends JSON with Content-Type: text/plain.
+    # Detect JSON by Content-Type or by body starting with "{".
     ct = content_type.split(";")[0].strip().lower()
-    if ct == "application/json":
+    is_json = ct == "application/json" or raw.startswith("{")
+
+    if is_json:
         # JSON — old format (with key) or new (without key, with template)
         try:
-            json_data = await request.json()
+            json_data = json.loads(raw)
             payload = AlertPayload(**json_data)
         except Exception:
             logger.warning("Invalid JSON payload from IP: %s", get_client_ip(request))
@@ -215,11 +227,7 @@ async def _handle_webhook(request: Request, key_from_url: str | None) -> dict:
         extra = payload.model_dump(exclude_none=True, exclude={"key", "msg", "template"})
     else:
         # Plain text — entire body is the message
-        try:
-            body = await request.body()
-            msg = body.decode("utf-8").strip()
-        except Exception:
-            raise HTTPException(status_code=400, detail="Cannot read body")
+        msg = raw
 
         if not msg or len(msg) > 4000:
             raise HTTPException(
