@@ -47,6 +47,9 @@ st.markdown("""
 REGEX_NAME = re.compile(r"^[a-z0-9_-]{1,64}$")
 MAX_ALIASES = 50
 
+# Common TradingView placeholders for quick-add
+TV_PLACEHOLDERS = ["ticker", "exchange", "close", "open", "high", "low", "volume", "interval", "time"]
+
 st.subheader("WEBHOOK ALIASES")
 
 with st.expander("What are aliases?", expanded=False):
@@ -140,12 +143,30 @@ if editing and editing in aliases:
 # --- New Alias (only when not editing) ---
 if not editing:
     st.markdown("### ADD NEW ALIAS")
+
+    # Quick-add variable buttons (outside form — forms can't dynamically update)
+    if "new_alias_vars" not in st.session_state:
+        st.session_state.new_alias_vars = ""
+
     with st.expander("Add", expanded=False):
+      st.caption("Quick-add TradingView variables:")
+      pill_cols = st.columns(len(TV_PLACEHOLDERS))
+      for i, var in enumerate(TV_PLACEHOLDERS):
+          with pill_cols[i]:
+              if st.button(f"{{{{{var}}}}}", key=f"qv_{var}", use_container_width=True):
+                  current = st.session_state.new_alias_vars
+                  existing = [v.strip() for v in current.split(",") if v.strip()]
+                  if var not in existing:
+                      existing.append(var)
+                      st.session_state.new_alias_vars = ", ".join(existing)
+                      st.rerun()
+
       with st.form("form_new_alias", border=True):
         new_name = st.text_input("ALIAS NAME (a-z, 0-9, _, -)", max_chars=64)
         new_template = st.text_area("TEMPLATE CONTENT", height=150, max_chars=4000,
                                     help="Use {variable} for placeholders, e.g. {ticker}")
         new_variables = st.text_input("VARIABLES (comma-separated)",
+                                      value=st.session_state.new_alias_vars,
                                       help="Must match {placeholders} in template")
         if st.form_submit_button("CREATE", use_container_width=True):
             name_to_save = new_name.strip().lower().replace(" ", "_")
@@ -178,6 +199,7 @@ if not editing:
                 }
                 save_aliases(aliases)
             st.success(f"CREATED '/{name_to_save}'")
+            st.session_state.new_alias_vars = ""
             st.rerun()
 
 # --- List of Aliases ---
@@ -244,21 +266,27 @@ if aliases:
                         st.rerun()
                 st.markdown('</div>', unsafe_allow_html=True)
 
-            # TradingView shortcut with always-visible copy button
+            # TradingView ready-to-paste JSON with SEC_KEY and alias
             variables = data.get("variables", [])
             safe_name = html.escape(name)
-            tv_shortcut = f"/{safe_name}"
+            settings = Settings()
+            alias_cmd = f"/{safe_name}"
             if variables:
-                tv_shortcut += " " + " ".join(f"{{{{{html.escape(v)}}}}}" for v in variables)
+                alias_cmd += " " + " ".join(f"{{{{{html.escape(v)}}}}}" for v in variables)
+            # Build JSON snippet with escaped braces for JS
+            safe_key = html.escape(settings.sec_key)
+            tv_json = '{' + f'&quot;key&quot;: &quot;{safe_key}&quot;, &quot;msg&quot;: &quot;{alias_cmd}&quot;' + '}'
+            # Raw text for clipboard (unescaped)
+            tv_json_raw = '{"key": "' + settings.sec_key.replace('"', '\\"') + '", "msg": "' + alias_cmd.replace('&quot;', '"') + '"}'
             components.html(f"""
             <div style="display:flex;align-items:center;gap:10px;background:#000;
                         padding:8px 12px;border-radius:5px;border:1px solid #30363D;
                         font-family:'Courier New',monospace;">
                 <span style="color:#8b949e;font-size:12px;white-space:nowrap;">TradingView Message:</span>
-                <code id="tv_{safe_name}" style="color:#00FF41;font-size:13px;flex:1;background:none;
-                      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{tv_shortcut}</code>
+                <code id="tv_{safe_name}" style="color:#00FF41;font-size:12px;flex:1;background:none;
+                      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{tv_json}</code>
                 <button id="btn_{safe_name}" onclick="
-                    navigator.clipboard.writeText(document.getElementById('tv_{safe_name}').innerText).then(()=>{{
+                    navigator.clipboard.writeText('{tv_json_raw}').then(()=>{{
                         document.getElementById('btn_{safe_name}').innerText='Copied!';
                         setTimeout(()=>document.getElementById('btn_{safe_name}').innerText='Copy',1500);
                     }})
