@@ -1,7 +1,7 @@
 services:
   webhook:
     build: .
-    container_name: TradingView-Webhook
+    container_name: TView_to_social
     ports:
       - "127.0.0.1:80:1990"  # Localhost only — cloudflared connects locally
     volumes:
@@ -22,7 +22,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.streamlit
-    container_name: TradingView-Dashboard
+    container_name: TView_to_social-Dashboard
     ports:
       - "0.0.0.0:8501:8501"  # Available on LAN — protected by password (DASHBOARD_PASSWORD)
     environment:

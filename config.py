@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     send_alerts_telegram: bool = True
     send_alerts_telegram_2: bool = False
     tg_token: str = ""
-    channel: str = "-1001929276330"
+    channel: str = ""
     channel_2: str = ""            # Second Telegram group (optional)
 
     # Discord settings
@@ -71,4 +71,6 @@ def reload_settings() -> Settings:
             logger.info("Configuration reloaded from .env")
         except Exception as e:
             logger.warning("Problem reloading .env: %s. Using old data.", e)
+            if _settings is None:
+                raise RuntimeError(f"Cannot load configuration: {e}") from e
     return _settings

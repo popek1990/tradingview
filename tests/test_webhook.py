@@ -52,7 +52,7 @@ class TestWebhook:
 
     @pytest.mark.asyncio
     async def test_valid_payload(self, client, monkeypatch):
-        """Valid payload with correct key — 200."""
+        """Valid payload with correct key — 200 (warning when no channels)."""
         monkeypatch.setenv("SEND_ALERTS_TELEGRAM", "False")
         async with client as c:
             resp = await c.post("/webhook", json={
@@ -60,7 +60,7 @@ class TestWebhook:
                 "msg": "Test message",
             })
         assert resp.status_code == 200
-        assert resp.json()["status"] == "ok"
+        assert resp.json()["status"] in ("ok", "warning")
 
     @pytest.mark.asyncio
     async def test_bad_key(self, client):
@@ -124,18 +124,18 @@ class TestWebhookKeyInUrl:
 
     @pytest.mark.asyncio
     async def test_key_in_url_json(self, client, monkeypatch):
-        """Key in URL + JSON body without key field — 200."""
+        """Key in URL + JSON body without key field — 200 (warning when no channels)."""
         monkeypatch.setenv("SEND_ALERTS_TELEGRAM", "False")
         async with client as c:
             resp = await c.post("/webhook/test_secret_key_123", json={
                 "msg": "Test with key in URL",
             })
         assert resp.status_code == 200
-        assert resp.json()["status"] == "ok"
+        assert resp.json()["status"] in ("ok", "warning")
 
     @pytest.mark.asyncio
     async def test_key_in_url_plain_text(self, client, monkeypatch):
-        """Key in URL + plain text body — 200."""
+        """Key in URL + plain text body — 200 (warning when no channels)."""
         monkeypatch.setenv("SEND_ALERTS_TELEGRAM", "False")
         async with client as c:
             resp = await c.post(
@@ -144,7 +144,7 @@ class TestWebhookKeyInUrl:
                 headers={"content-type": "text/plain"},
             )
         assert resp.status_code == 200
-        assert resp.json()["status"] == "ok"
+        assert resp.json()["status"] in ("ok", "warning")
 
     @pytest.mark.asyncio
     async def test_key_in_url_bad(self, client):
@@ -203,7 +203,7 @@ class TestWebhookTemplates:
 
     @pytest.mark.asyncio
     async def test_template_valid(self, client, monkeypatch, _test_templates):
-        """Template with valid variables — 200."""
+        """Template with valid variables — 200 (warning when no channels)."""
         monkeypatch.setenv("SEND_ALERTS_TELEGRAM", "False")
         async with client as c:
             resp = await c.post("/webhook/test_secret_key_123", json={
@@ -213,7 +213,7 @@ class TestWebhookTemplates:
                 "close": "6910",
             })
         assert resp.status_code == 200
-        assert resp.json()["status"] == "ok"
+        assert resp.json()["status"] in ("ok", "warning")
 
     @pytest.mark.asyncio
     async def test_template_nonexistent(self, client, _test_templates):
@@ -259,7 +259,7 @@ class TestWebhookAliases:
 
     @pytest.mark.asyncio
     async def test_alias_valid(self, client, monkeypatch):
-        """Valid alias with correct args — 200."""
+        """Valid alias with correct args — 200 (warning when no channels)."""
         monkeypatch.setenv("SEND_ALERTS_TELEGRAM", "False")
         async with client as c:
             resp = await c.post(
@@ -268,7 +268,7 @@ class TestWebhookAliases:
                 headers={"content-type": "text/plain"},
             )
         assert resp.status_code == 200
-        assert resp.json()["status"] == "ok"
+        assert resp.json()["status"] in ("ok", "warning")
 
     @pytest.mark.asyncio
     async def test_alias_no_variables(self, client, monkeypatch):

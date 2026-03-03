@@ -6,7 +6,7 @@ from config import Settings
 from ui_utils import save_and_reload
 
 # Must be first Streamlit command
-st.set_page_config(page_title="TradingView Alerts", page_icon="🔑", layout="wide")
+st.set_page_config(page_title="TradingView Alerts", page_icon="viking_logo.jpg", layout="wide")
 
 check_login()
 
@@ -21,7 +21,8 @@ with st.form("form_keys", border=True):
         "SEC_KEY (Auth key for Webhooks)",
         value=settings.sec_key,
         type="password",
-        help="Min. 16 chars. Must match the key set in TradingView.",
+        help="Min. 16 chars. Must match the key set in TradingView. "
+             "Generate with: python3 -c \"import secrets; print(secrets.token_urlsafe(32))\"",
     )
     dashboard_password = st.text_input(
         "DASHBOARD_PASSWORD (Panel Access)",
@@ -55,11 +56,16 @@ if submit:
         st.error("DASHBOARD_PASSWORD cannot be empty!")
         st.stop()
 
+    if sec_key.strip() and len(sec_key.strip()) < 16:
+        st.error("SEC_KEY must be at least 16 characters!")
+        st.stop()
+
+    # Strip whitespace from all credentials to prevent silent auth failures
     fields = {
-        "SEC_KEY": sec_key,
-        "TG_TOKEN": tg_token,
-        "DISCORD_WEBHOOK": discord_webhook,
-        "SLACK_WEBHOOK": slack_webhook,
-        "DASHBOARD_PASSWORD": dashboard_password,
+        "SEC_KEY": sec_key.strip(),
+        "TG_TOKEN": tg_token.strip(),
+        "DISCORD_WEBHOOK": discord_webhook.strip(),
+        "SLACK_WEBHOOK": slack_webhook.strip(),
+        "DASHBOARD_PASSWORD": dashboard_password.strip(),
     }
     save_and_reload(fields)

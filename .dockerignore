@@ -6,4 +6,11 @@ backups
 .env
 .dockerignore
 .gitignore
-*.md
+.claude/
+*.zip
+tests/
+pytest.ini
+CLAUDE.md
+GEMINI.md
+plan.md
+README.md

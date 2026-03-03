@@ -7,6 +7,7 @@
 
 import json
 import logging
+import re
 import threading
 from pathlib import Path
 
@@ -46,11 +47,14 @@ def render(name: str, variables: dict) -> str:
         raise KeyError(f"Template '{name}' does not exist")
 
     template = templates[name]
+    if "content" not in template:
+        raise KeyError(f"Template '{name}' is malformed (missing 'content' key)")
     content = template["content"]
     required = template.get("variables", [])
 
-    # Substitute variables — safe str.replace() instead of str.format()
-    result = content
-    for k in required:
-        result = result.replace(f"{{{k}}}", str(variables.get(k, "")))
-    return result
+    # Simultaneous replacement — prevents variable value injection
+    replacements = {f"{{{k}}}": str(variables.get(k, "")) for k in required}
+    if not replacements:
+        return content
+    pattern = "|".join(re.escape(k) for k in replacements)
+    return re.sub(pattern, lambda m: replacements[m.group(0)], content)

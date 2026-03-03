@@ -9,7 +9,7 @@ from config import Settings
 from ui_utils import WEBHOOK_URL, safe_html
 
 # Must be first Streamlit command
-st.set_page_config(page_title="TradingView Alerts", page_icon="🧪", layout="wide")
+st.set_page_config(page_title="TradingView Alerts", page_icon="viking_logo.jpg", layout="wide")
 
 check_login()
 
@@ -39,10 +39,11 @@ if submit:
         st.error("MISSING SEC_KEY. Configure it first.")
         st.stop()
 
-    # Determine payload
+    # Determine payload (strip "key" from user JSON to prevent accidental override)
     try:
         potential_json = json.loads(msg.strip())
         if isinstance(potential_json, dict):
+            potential_json.pop("key", None)
             payload = {"key": settings.sec_key, **potential_json}
         else: raise ValueError()
     except Exception:

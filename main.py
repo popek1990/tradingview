@@ -4,7 +4,9 @@
 # ----------------------------------------------- #
 
 import asyncio
+import hashlib
 import hmac
+import ipaddress
 import logging
 import logging.handlers
 import os
@@ -87,18 +89,33 @@ app = FastAPI(
 app.state.limiter = limiter
 
 # Trusted Host middleware
+_default_hosts = "localhost,127.0.0.1,webhook,test,testserver"
+_allowed_hosts = os.getenv("ALLOWED_HOSTS", _default_hosts).split(",")
 app.add_middleware(
     TrustedHostMiddleware,
-    allowed_hosts=["tv.popeklab.com", "localhost", "127.0.0.1", "webhook", "test", "testserver"],
+    allowed_hosts=[h.strip() for h in _allowed_hosts],
 )
 
 
-# Body size limit (max 10KB)
+# Body size limit (max 10KB) — checks actual body, not just Content-Length header
+MAX_BODY_SIZE = 10_000
+
 @app.middleware("http")
 async def limit_body_size(request: Request, call_next):
+    # Quick reject via Content-Length header (before reading body)
     content_length = request.headers.get("content-length")
-    if content_length and int(content_length) > 10_000:
-        return JSONResponse(status_code=413, content={"detail": "Payload too large"})
+    try:
+        if content_length and int(content_length) > MAX_BODY_SIZE:
+            return JSONResponse(status_code=413, content={"detail": "Payload too large"})
+    except ValueError:
+        return JSONResponse(status_code=400, content={"detail": "Invalid Content-Length"})
+
+    # Verify actual body size (handles chunked encoding and lying clients)
+    if request.method in ("POST", "PUT", "PATCH"):
+        body = await request.body()
+        if len(body) > MAX_BODY_SIZE:
+            return JSONResponse(status_code=413, content={"detail": "Payload too large"})
+
     return await call_next(request)
 
 
@@ -151,8 +168,7 @@ async def _handle_webhook(request: Request, key_from_url: str | None) -> dict:
             json_data = await request.json()
             payload = AlertPayload(**json_data)
         except Exception:
-            ip = request.client.host if request.client else "unknown"
-            logger.warning("Invalid JSON payload from IP: %s", ip)
+            logger.warning("Invalid JSON payload from IP: %s", get_client_ip(request))
             raise HTTPException(status_code=400, detail="Invalid payload")
 
         key = key_from_url or payload.key
@@ -180,9 +196,11 @@ async def _handle_webhook(request: Request, key_from_url: str | None) -> dict:
 
     settings = get_settings()
 
-    if not hmac.compare_digest(key, settings.sec_key):
-        ip = request.client.host if request.client else "unknown"
-        logger.warning("Alert rejected (invalid key) from IP: %s", ip)
+    if not hmac.compare_digest(
+        hashlib.sha256(key.encode()).digest(),
+        hashlib.sha256(settings.sec_key.encode()).digest(),
+    ):
+        logger.warning("Alert rejected (invalid key) from IP: %s", get_client_ip(request))
         raise HTTPException(status_code=403, detail="Invalid key")
 
     # Alias handling (e.g., "/spot BTCUSDT BINANCE 68000")
@@ -209,9 +227,19 @@ async def _handle_webhook(request: Request, key_from_url: str | None) -> dict:
 
     logger.info("Alert received — sending to channels...")
     alert_data = {"msg": msg, **extra}
-    results = await asyncio.to_thread(send_alert, alert_data)
+    try:
+        results = await asyncio.wait_for(
+            asyncio.to_thread(send_alert, alert_data), timeout=30
+        )
+    except asyncio.TimeoutError:
+        logger.error("Alert dispatch timed out (30s)")
+        raise HTTPException(status_code=504, detail="Alert dispatch timed out")
 
-    if results and not any(results.values()):
+    if not results:
+        logger.warning("No channels enabled — alert not sent")
+        return {"status": "warning", "detail": "No channels enabled", "channels": {}}
+
+    if not any(results.values()):
         logger.error("All channels failed: %s", results)
         raise HTTPException(status_code=502, detail="All channels failed")
 
@@ -239,8 +267,26 @@ async def reload_config(request: Request):
 
     Restricted to internal Docker network (172.x) and localhost.
     """
-    ip = get_client_ip(request)
-    if not (ip.startswith("172.") or ip.startswith("127.") or ip == "localhost"):
+    # Use actual TCP source IP for access control (not spoofable headers)
+    raw_ip = request.client.host if request.client else None
+    if not raw_ip:
+        raise HTTPException(status_code=403, detail="Access only from internal network")
+
+    _PRIVATE_NETWORKS = (
+        ipaddress.ip_network("10.0.0.0/8"),
+        ipaddress.ip_network("172.16.0.0/12"),
+        ipaddress.ip_network("192.168.0.0/16"),
+        ipaddress.ip_network("127.0.0.0/8"),
+        ipaddress.ip_network("::1/128"),
+        ipaddress.ip_network("fc00::/7"),
+    )
+    try:
+        addr = ipaddress.ip_address(raw_ip)
+        is_internal = any(addr in net for net in _PRIVATE_NETWORKS)
+    except ValueError:
+        is_internal = False
+
+    if not is_internal:
         raise HTTPException(status_code=403, detail="Access only from internal network")
 
     try:
@@ -251,7 +297,10 @@ async def reload_config(request: Request):
     settings = get_settings()
 
     key = data.get("key", "")
-    if not key or not hmac.compare_digest(key, settings.sec_key):
+    if not key or not hmac.compare_digest(
+        hashlib.sha256(key.encode()).digest(),
+        hashlib.sha256(settings.sec_key.encode()).digest(),
+    ):
         raise HTTPException(status_code=403, detail="Invalid key")
 
     reload_settings()
