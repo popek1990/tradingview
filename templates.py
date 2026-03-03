@@ -7,7 +7,9 @@
 
 import json
 import logging
+import os
 import re
+import tempfile
 import threading
 from pathlib import Path
 
@@ -27,12 +29,21 @@ def load_templates() -> dict:
 
 
 def save_templates(templates: dict) -> None:
-    """Saves templates to JSON file."""
+    """Saves templates to JSON file atomically (tempfile + os.replace)."""
     with _lock:
-        TEMPLATES_FILE_PATH.write_text(
-            json.dumps(templates, ensure_ascii=False, indent=2),
-            encoding="utf-8",
+        fd, tmp_path = tempfile.mkstemp(
+            dir=str(TEMPLATES_FILE_PATH.parent), suffix=".tmp",
         )
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump(templates, f, ensure_ascii=False, indent=2)
+            os.replace(tmp_path, str(TEMPLATES_FILE_PATH))
+        except Exception:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+            raise
     logger.info("Templates saved (%d templates)", len(templates))
 
 

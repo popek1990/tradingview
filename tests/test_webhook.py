@@ -284,7 +284,7 @@ class TestWebhookAliases:
 
     @pytest.mark.asyncio
     async def test_alias_unknown(self, client):
-        """Unknown alias — 400."""
+        """Unknown alias — 400 with generic error (no internal details)."""
         async with client as c:
             resp = await c.post(
                 "/webhook/test_secret_key_123",
@@ -292,11 +292,11 @@ class TestWebhookAliases:
                 headers={"content-type": "text/plain"},
             )
         assert resp.status_code == 400
-        assert "Unknown alias" in resp.json()["detail"]
+        assert resp.json()["detail"] == "Invalid request"
 
     @pytest.mark.asyncio
     async def test_alias_wrong_arg_count(self, client):
-        """Alias with wrong number of args — 400."""
+        """Alias with wrong number of args — 400 with generic error."""
         async with client as c:
             resp = await c.post(
                 "/webhook/test_secret_key_123",
@@ -304,7 +304,7 @@ class TestWebhookAliases:
                 headers={"content-type": "text/plain"},
             )
         assert resp.status_code == 400
-        assert "expects 3 args" in resp.json()["detail"]
+        assert resp.json()["detail"] == "Invalid request"
 
     @pytest.mark.asyncio
     async def test_alias_bad_key(self, client):

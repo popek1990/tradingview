@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     dashboard_password: str = ""
 
     # Telegram settings
-    send_alerts_telegram: bool = True
+    send_alerts_telegram: bool = False
     send_alerts_telegram_2: bool = False
     tg_token: str = ""
     channel: str = ""

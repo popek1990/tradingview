@@ -20,9 +20,14 @@ TEST_ENV = {
 
 @pytest.fixture(autouse=True)
 def _clear_singleton():
-    """Resets settings singleton before each test."""
+    """Resets settings singleton and handler caches before each test."""
     import config
+    import handler
     config._settings = None
+    # Reset Telegram bot cache
+    handler._tg_bot_cache = None
+    with handler._tg_names_lock:
+        handler._tg_names_cache.clear()
     yield
     config._settings = None
 
