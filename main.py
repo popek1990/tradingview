@@ -207,6 +207,8 @@ async def _handle_webhook(request: Request, key_from_url: str | None) -> dict:
     except Exception:
         raise HTTPException(status_code=400, detail="Cannot read body")
 
+
+
     # TradingView sometimes sends JSON with Content-Type: text/plain.
     # Detect JSON by Content-Type or by body starting with "{".
     ct = content_type.split(";")[0].strip().lower()
