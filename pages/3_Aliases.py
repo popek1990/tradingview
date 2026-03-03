@@ -269,35 +269,39 @@ if aliases:
                 st.markdown('</div>', unsafe_allow_html=True)
 
             # TradingView ready-to-paste JSON with SEC_KEY and alias
+            import json as _json
             variables = data.get("variables", [])
             safe_name = html.escape(name)
             settings = Settings()
-            alias_cmd = f"/{safe_name}"
+            alias_cmd = f"/{name}"
             if variables:
-                alias_cmd += " " + " ".join(f"{{{{{html.escape(v)}}}}}" for v in variables)
-            # Build JSON snippet with escaped braces for JS
-            safe_key = html.escape(settings.sec_key)
-            tv_json = '{' + f'&quot;key&quot;: &quot;{safe_key}&quot;, &quot;msg&quot;: &quot;{alias_cmd}&quot;' + '}'
-            # Raw text for clipboard (unescaped)
-            tv_json_raw = '{"key": "' + settings.sec_key.replace('"', '\\"') + '", "msg": "' + alias_cmd.replace('&quot;', '"') + '"}'
+                alias_cmd += " " + " ".join(f"{{{{{v}}}}}" for v in variables)
+            tv_json_raw = _json.dumps({"key": settings.sec_key, "msg": alias_cmd})
+            # Escape for safe embedding in JS string literal and HTML
+            tv_json_js = tv_json_raw.replace("\\", "\\\\").replace("`", "\\`").replace("$", "\\$")
+            tv_json_display = html.escape(tv_json_raw)
             components.html(f"""
             <div style="display:flex;align-items:center;gap:10px;background:#000;
                         padding:8px 12px;border-radius:5px;border:1px solid #30363D;
                         font-family:'Courier New',monospace;">
                 <span style="color:#8b949e;font-size:12px;white-space:nowrap;">TradingView Message:</span>
-                <code id="tv_{safe_name}" style="color:#00FF41;font-size:12px;flex:1;background:none;
-                      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{tv_json}</code>
-                <button id="btn_{safe_name}" onclick="
-                    navigator.clipboard.writeText('{tv_json_raw}').then(()=>{{
-                        document.getElementById('btn_{safe_name}').innerText='Copied!';
-                        setTimeout(()=>document.getElementById('btn_{safe_name}').innerText='Copy',1500);
-                    }})
-                " style="background:#161B22;color:#00FF41;border:1px solid #30363D;border-radius:3px;
+                <code style="color:#00FF41;font-size:12px;flex:1;background:none;
+                      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{tv_json_display}</code>
+                <button id="btn_{safe_name}" style="background:#161B22;color:#00FF41;border:1px solid #30363D;border-radius:3px;
                          padding:3px 12px;cursor:pointer;font-family:'Courier New',monospace;
                          font-size:11px;white-space:nowrap;transition:all .2s;"
                    onmouseover="this.style.background='#00FF41';this.style.color='#0D1117'"
                    onmouseout="this.style.background='#161B22';this.style.color='#00FF41'">Copy</button>
             </div>
+            <script>
+                document.getElementById('btn_{safe_name}').addEventListener('click', function() {{
+                    var btn = this;
+                    navigator.clipboard.writeText(`{tv_json_js}`).then(function() {{
+                        btn.innerText = 'Copied!';
+                        setTimeout(function() {{ btn.innerText = 'Copy'; }}, 1500);
+                    }});
+                }});
+            </script>
             """, height=42)
 else:
     st.info("NO ALIASES DEFINED")
