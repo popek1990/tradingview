@@ -30,8 +30,14 @@ def _set_env_key(filepath: str, key: str, value: str) -> bool:
                 lines = f.readlines()
 
         # Quote value if it contains special shell characters
-        needs_quoting = any(c in value for c in " &$!#\"'\\`|;(){}[]<>")
-        quoted = f"'{value}'" if needs_quoting and value else value
+        if "'" in value:
+            # Single quotes inside — use double quotes with escaping
+            escaped = value.replace("\\", "\\\\").replace('"', '\\"').replace("$", "\\$").replace("`", "\\`")
+            quoted = f'"{escaped}"'
+        elif any(c in value for c in ' &$!#"\\`|;(){}[]<>'):
+            quoted = f"'{value}'"
+        else:
+            quoted = value
 
         new_line = f"{key}={quoted}\n"
         pattern = re.compile(rf"^{re.escape(key)}=")

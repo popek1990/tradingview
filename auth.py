@@ -9,6 +9,7 @@ import hashlib
 import hmac
 import json
 import logging
+import secrets
 import threading
 import time
 from pathlib import Path
@@ -19,8 +20,9 @@ from ui_utils import render_ui_header, render_sidebar_info
 
 logger = logging.getLogger(__name__)
 
-INVALIDATED_TOKENS_FILE = Path(__file__).parent / "invalidated_tokens.json"
+INVALIDATED_TOKENS_FILE = Path(__file__).parent / "logs" / "invalidated_tokens.json"
 IP_LOCKS_FILE = Path(__file__).parent / "logs" / "auth_locks.json"
+_HMAC_KEY_FILE = Path(__file__).parent / "logs" / ".hmac_key"
 
 MAX_ATTEMPTS = 10
 LOCKOUT_SECONDS = 900  # 15 minutes
@@ -127,30 +129,49 @@ def _get_invalidated_tokens():
 
 # ── Token helpers ────────────────────────────────────────────────
 
+def _get_hmac_key() -> str:
+    """Returns a persistent HMAC signing key (generated once, stored on disk).
+
+    Independent of the dashboard password — changing the password does NOT
+    invalidate existing sessions.  Delete logs/.hmac_key to force logout all.
+    """
+    try:
+        return _HMAC_KEY_FILE.read_text().strip()
+    except FileNotFoundError:
+        key = secrets.token_hex(32)
+        _HMAC_KEY_FILE.parent.mkdir(mode=0o750, exist_ok=True)
+        _HMAC_KEY_FILE.write_text(key)
+        return key
+
+
 def _create_token(secret: str) -> str:
-    """Creates a self-signed session token: ``timestamp.signature``.
+    """Creates a self-signed session token: ``timestamp.nonce.signature``.
 
     No server-side storage needed — validated purely via HMAC.
+    Nonce ensures uniqueness even for tokens created in the same second.
     """
     ts = str(int(time.time()))
-    sig = hmac.new(secret.encode(), ts.encode(), hashlib.sha256).hexdigest()
-    return f"{ts}.{sig}"
+    nonce = secrets.token_hex(16)
+    payload = f"{ts}.{nonce}"
+    sig = hmac.new(secret.encode(), payload.encode(), hashlib.sha256).hexdigest()
+    return f"{ts}.{nonce}.{sig}"
 
 
 def _validate_token(token: str, secret: str) -> bool:
     """Validates HMAC signature, checks expiry and logout blacklist."""
     try:
         parts = token.split(".")
-        if len(parts) != 2:
+        if len(parts) != 3:
             return False
-        ts_str, sig = parts
+        ts_str, nonce, sig = parts
         ts = int(ts_str)
 
         if time.time() - ts > SESSION_TTL:
             return False
 
+        payload = f"{ts_str}.{nonce}"
         expected = hmac.new(
-            secret.encode(), ts_str.encode(), hashlib.sha256,
+            secret.encode(), payload.encode(), hashlib.sha256,
         ).hexdigest()
         if not hmac.compare_digest(sig, expected):
             return False
@@ -163,27 +184,23 @@ def _validate_token(token: str, secret: str) -> bool:
 def _get_client_ip() -> str:
     """Best-effort client IP for per-IP brute-force tracking in Streamlit.
 
-    Uses socket IP (peer address) when available, since Streamlit typically
-    runs without a reverse proxy in local/LAN deployments. This prevents
-    IP spoofing via X-Forwarded-For headers.
-    Falls back to X-Forwarded-For only when socket IP is a loopback address
-    (indicating a real reverse proxy in front).
+    Priority: Cf-Connecting-Ip (Cloudflare, not spoofable behind tunnel)
+    > X-Real-Ip (peer/proxy IP, non-loopback only) > "unknown".
+    X-Forwarded-For removed — spoofable without trusted proxy chain.
     """
     try:
         ctx = st.runtime.scriptrunner.get_script_run_ctx()
         if ctx and hasattr(ctx, "request") and ctx.request:
             headers = getattr(ctx.request, "headers", {})
 
-            # Prefer socket IP (not spoofable) for brute-force tracking
+            # Cloudflare Tunnel sets this — not spoofable behind the tunnel
+            cf_ip = headers.get("Cf-Connecting-Ip", "")
+            if cf_ip:
+                return cf_ip
+
+            # Fallback: peer IP from proxy (non-loopback only)
             peer_ip = headers.get("X-Real-Ip", "")
-
-            # Only trust forwarded headers when behind a known proxy (loopback peer)
-            if not peer_ip or peer_ip.startswith("127.") or peer_ip == "::1":
-                forwarded = headers.get("X-Forwarded-For", "").split(",")[0].strip()
-                if forwarded:
-                    return forwarded
-
-            if peer_ip:
+            if peer_ip and not peer_ip.startswith("127.") and peer_ip != "::1":
                 return peer_ip
     except Exception:
         pass
@@ -266,7 +283,7 @@ def check_login():
         or st.query_params.get(SESSION_PARAM)
     )
 
-    if token and _validate_token(str(token), secret):
+    if token and _validate_token(str(token), _get_hmac_key()):
         token = str(token)
 
         # Sync → session_state (survives sidebar page navigation)
@@ -311,7 +328,7 @@ def check_login():
                 _save_ip_locks(ip_locks)
             except Exception as e:
                 logger.warning("Failed to persist IP locks: %s", e)
-            new_token = _create_token(secret)
+            new_token = _create_token(_get_hmac_key())
             st.session_state["session_token"] = new_token
             st.query_params[SESSION_PARAM] = new_token
             st.rerun()
