@@ -321,7 +321,10 @@ def check_login():
         submit = st.form_submit_button("Log In")
 
     if submit:
-        if hmac.compare_digest(password, secret):
+        if hmac.compare_digest(
+            hashlib.sha256(password.encode()).hexdigest(),
+            hashlib.sha256(secret.encode()).hexdigest(),
+        ):
             with _auth_lock:
                 ip_locks.pop(client_ip, None)
             try:
