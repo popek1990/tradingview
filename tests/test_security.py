@@ -2,6 +2,7 @@
 
 import hmac
 import hashlib
+import secrets
 import time
 import json
 
@@ -142,19 +143,25 @@ class TestTokenValidation:
 
     def test_expired_token(self):
         from auth import _validate_token, SESSION_TTL
-        # Create token with timestamp far in the past
+        # Create token with timestamp far in the past (new 3-part format)
         ts = str(int(time.time()) - SESSION_TTL - 100)
-        sig = hmac.new("secret".encode(), ts.encode(), hashlib.sha256).hexdigest()
-        token = f"{ts}.{sig}"
+        nonce = secrets.token_hex(16)
+        payload = f"{ts}.{nonce}"
+        sig = hmac.new("secret".encode(), payload.encode(), hashlib.sha256).hexdigest()
+        token = f"{ts}.{nonce}.{sig}"
         assert _validate_token(token, "secret") is False
 
     def test_malformed_token_no_dot(self):
         from auth import _validate_token
         assert _validate_token("nodottoken", "secret") is False
 
-    def test_malformed_token_multiple_dots(self):
+    def test_malformed_token_too_many_parts(self):
         from auth import _validate_token
-        assert _validate_token("a.b.c", "secret") is False
+        assert _validate_token("a.b.c.d", "secret") is False
+
+    def test_malformed_token_two_parts(self):
+        from auth import _validate_token
+        assert _validate_token("a.b", "secret") is False
 
     def test_malformed_token_empty(self):
         from auth import _validate_token
@@ -168,6 +175,34 @@ class TestTokenValidation:
         # Blacklist the token
         _get_invalidated_tokens()[token] = time.time() + 3600
         assert _validate_token(token, secret) is False
+
+    def test_token_uniqueness(self):
+        """Two tokens created with the same secret must differ (nonce)."""
+        from auth import _create_token
+        secret = "test_secret_password"
+        t1 = _create_token(secret)
+        t2 = _create_token(secret)
+        assert t1 != t2
+
+    def test_token_has_three_parts(self):
+        """Token format must be timestamp.nonce.signature."""
+        from auth import _create_token
+        token = _create_token("secret")
+        parts = token.split(".")
+        assert len(parts) == 3
+        # First part is numeric timestamp
+        assert parts[0].isdigit()
+        # Second part is hex nonce (32 hex chars = 16 bytes)
+        assert len(parts[1]) == 32
+        assert all(c in "0123456789abcdef" for c in parts[1])
+
+
+class TestInvalidatedTokensPath:
+    """P5: invalidated_tokens.json must be in logs/ (Docker named volume)."""
+
+    def test_invalidated_tokens_in_logs_dir(self):
+        from auth import INVALIDATED_TOKENS_FILE
+        assert INVALIDATED_TOKENS_FILE.parent.name == "logs"
 
 
 class TestEmptySECKEYValidation:
@@ -231,7 +266,7 @@ class TestGenericErrorMessages:
 
 
 class TestDeprecationWarning:
-    """Verify /webhook/{key} endpoint logs deprecation warning."""
+    """Verify /webhook/{key} endpoint logs deprecation warning + sunset headers."""
 
     @pytest.mark.asyncio
     async def test_key_in_url_still_works(self, client, monkeypatch):
@@ -243,3 +278,39 @@ class TestDeprecationWarning:
             })
         assert resp.status_code == 200
         assert resp.json()["status"] in ("ok", "warning")
+
+    @pytest.mark.asyncio
+    async def test_sunset_headers_present(self, client, monkeypatch):
+        """P6: /webhook/{key} must include Deprecation and Sunset headers."""
+        monkeypatch.setenv("SEND_ALERTS_TELEGRAM", "False")
+        async with client as c:
+            resp = await c.post("/webhook/test_secret_key_123", json={
+                "msg": "Test sunset headers",
+            })
+        assert resp.headers.get("Deprecation") == "true"
+        assert resp.headers.get("Sunset") == "2026-06-01"
+
+
+class TestHmacKeyIndependence:
+    """P4: HMAC signing key must be independent of the dashboard password."""
+
+    def test_get_hmac_key_returns_stable_key(self, tmp_path, monkeypatch):
+        """_get_hmac_key() generates and persists a key."""
+        import auth
+        key_file = tmp_path / ".hmac_key"
+        monkeypatch.setattr(auth, "_HMAC_KEY_FILE", key_file)
+        key1 = auth._get_hmac_key()
+        key2 = auth._get_hmac_key()
+        assert key1 == key2
+        assert len(key1) == 64  # 32 bytes = 64 hex chars
+
+    def test_hmac_key_independent_of_password(self, tmp_path, monkeypatch):
+        """Token signed with HMAC key validates regardless of password change."""
+        import auth
+        key_file = tmp_path / ".hmac_key"
+        monkeypatch.setattr(auth, "_HMAC_KEY_FILE", key_file)
+        hmac_key = auth._get_hmac_key()
+        token = auth._create_token(hmac_key)
+        # Token validates with HMAC key, not with any password
+        assert auth._validate_token(token, hmac_key) is True
+        assert auth._validate_token(token, "some_password") is False

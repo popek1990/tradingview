@@ -311,7 +311,11 @@ async def webhook_with_key(request: Request, key: str = Path(..., max_length=256
         "DEPRECATED: key in URL path from %s — use POST /webhook with key in JSON body",
         get_client_ip(request),
     )
-    return await _handle_webhook(request, key_from_url=key)
+    result = await _handle_webhook(request, key_from_url=key)
+    return JSONResponse(
+        content=result,
+        headers={"Deprecation": "true", "Sunset": "2026-06-01"},
+    )
 
 
 @app.post("/reload-config")

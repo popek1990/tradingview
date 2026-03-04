@@ -114,6 +114,11 @@ backups/
 *.zip
 .claude/
 logs/
+AUDIT_REPORT.md
+poprawki_04luty.md
+pomocne/
+ENV_EXPORT.txt
+PYTHON_VERSION.txt
 
 # Virtual environments
 .venv
