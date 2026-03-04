@@ -115,12 +115,17 @@ def send_alert(data: dict[str, Any]) -> dict[str, bool]:
     # Second Telegram group
     if settings.send_alerts_telegram_2 and settings.channel_2:
         try:
-            tg_bot = _get_tg_bot(settings.tg_token)
-            group_name_2 = _get_group_name(tg_bot, settings.channel_2)
+            channel_2 = str(settings.channel_2)
+            if not re.match(r"^-?\d+$", channel_2):
+                logger.warning("Telegram 2: invalid channel ID format: rejected")
+                results["telegram_2"] = False
+            else:
+                tg_bot = _get_tg_bot(settings.tg_token)
+                group_name_2 = _get_group_name(tg_bot, channel_2)
 
-            _tg_send_message(tg_bot, settings.channel_2, msg)
-            logger.info("Telegram 2: sent to %s", group_name_2)
-            results["telegram_2"] = True
+                _tg_send_message(tg_bot, channel_2, msg)
+                logger.info("Telegram 2: sent to %s", group_name_2)
+                results["telegram_2"] = True
         except Exception as e:
             logger.error("Telegram 2: %s", e)
             results["telegram_2"] = False

@@ -109,7 +109,7 @@ class TestSendAlert:
         """Telegram sends to two groups when channel_2 set and toggle enabled."""
         monkeypatch.setenv("SEND_ALERTS_TELEGRAM", "True")
         monkeypatch.setenv("SEND_ALERTS_TELEGRAM_2", "True")
-        monkeypatch.setenv("CHANNEL_2", "-100second_group")
+        monkeypatch.setenv("CHANNEL_2", "-100222333444")
         mock_instance = MagicMock()
         mock_bot.return_value = mock_instance
 
