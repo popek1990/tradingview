@@ -79,6 +79,29 @@ def save_aliases(aliases: dict) -> None:
     logger.info("Aliases saved (%d aliases)", len(aliases))
 
 
+PRICE_VARIABLES = {"close", "open", "high", "low"}
+
+
+def format_price(value: str) -> str:
+    """Format price with space as thousands separator, strip trailing .00.
+
+    69000.00 → 69 000, 0.0964 → 0.0964, 1234.50 → 1 234.50, abc → abc
+    """
+    try:
+        num = float(value)
+    except (ValueError, OverflowError):
+        return value
+
+    if num == int(num) and "." not in value or value.endswith(".00") or value.endswith(".0"):
+        formatted = f"{int(num):,}".replace(",", " ")
+    else:
+        int_part, dec_part = value.split(".")
+        int_formatted = f"{int(int_part):,}".replace(",", " ")
+        formatted = f"{int_formatted}.{dec_part}"
+
+    return formatted
+
+
 def humanize_interval(value: str) -> str:
     """Convert TradingView interval to human-readable format.
 
@@ -139,6 +162,8 @@ def parse_alias(text: str) -> str | None:
         if v == "interval":
             replacements["{interval_raw}"] = a
             replacements[f"{{{v}}}"] = humanize_interval(a)
+        elif v in PRICE_VARIABLES:
+            replacements[f"{{{v}}}"] = format_price(a)
         else:
             replacements[f"{{{v}}}"] = a
     if not replacements:

@@ -334,6 +334,28 @@ class TestWebhookAliases:
         assert resp.status_code == 403
 
 
+class TestFormatPrice:
+    """Unit tests for format_price()."""
+
+    @pytest.mark.parametrize("raw,expected", [
+        ("69000.00", "69 000"),
+        ("69000", "69 000"),
+        ("69000.50", "69 000.50"),
+        ("1234.56", "1 234.56"),
+        ("0.0964", "0.0964"),
+        ("100.00", "100"),
+        ("100.10", "100.10"),
+        ("1000000.00", "1 000 000"),
+        ("0.50", "0.50"),
+        ("abc", "abc"),
+        ("42", "42"),
+        ("69000.0", "69 000"),
+    ])
+    def test_format_price(self, raw, expected):
+        from aliases import format_price
+        assert format_price(raw) == expected
+
+
 class TestHumanizeInterval:
     """Unit tests for humanize_interval()."""
 
