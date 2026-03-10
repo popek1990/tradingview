@@ -15,6 +15,9 @@ def _check_template_vars(template: str, variables: list[str]) -> str | None:
     import re
     placeholders = set(re.findall(r"\{(\w+)\}", template))
     declared = set(variables)
+    # {interval_raw} is auto-generated when "interval" is declared — not a real variable
+    if "interval" in declared:
+        placeholders.discard("interval_raw")
     unused = declared - placeholders
     undeclared = placeholders - declared
     warnings = []
@@ -48,7 +51,7 @@ REGEX_NAME = re.compile(r"^[a-z0-9_-]{1,64}$")
 MAX_ALIASES = 50
 
 # Common TradingView placeholders for quick-add
-TV_PLACEHOLDERS = ["ticker", "exchange", "close", "open", "high", "low", "volume", "interval", "time"]
+TV_PLACEHOLDERS = ["ticker", "exchange", "close", "open", "high", "low", "volume", "interval", "interval_raw", "time"]
 
 st.subheader("WEBHOOK ALIASES")
 
@@ -198,8 +201,10 @@ if not editing:
               if st.button(f"{{{{{var}}}}}", key=f"qv_{var}", use_container_width=True):
                   current = st.session_state.new_alias_vars
                   existing = [v.strip() for v in current.split(",") if v.strip()]
-                  if var not in existing:
-                      existing.append(var)
+                  # interval_raw is auto-generated — add "interval" to variables instead
+                  var_to_add = "interval" if var == "interval_raw" else var
+                  if var_to_add not in existing:
+                      existing.append(var_to_add)
                       st.session_state.new_alias_vars = ", ".join(existing)
                       st.rerun()
               st.markdown('</div>', unsafe_allow_html=True)

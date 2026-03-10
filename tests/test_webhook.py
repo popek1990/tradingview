@@ -255,7 +255,7 @@ class TestWebhookAliases:
             },
             "withinterval": {
                 "variables": ["ticker", "interval"],
-                "template": "Alert {ticker} on {interval}",
+                "template": "Alert {ticker} on {interval} [chart](https://tv.com/?interval={interval_raw})",
             },
         }
         file.write_text(json.dumps(data), encoding="utf-8")
@@ -357,6 +357,58 @@ class TestHumanizeInterval:
     def test_humanize_interval(self, raw, expected):
         from aliases import humanize_interval
         assert humanize_interval(raw) == expected
+
+
+class TestIntervalRaw:
+    """Unit tests for {interval_raw} placeholder in parse_alias."""
+
+    def test_interval_raw_in_template(self, tmp_path, monkeypatch):
+        """Template with {interval_raw} gets raw value, {interval} gets humanized."""
+        import aliases as mod
+        file = tmp_path / "aliases.json"
+        data = {
+            "chart": {
+                "variables": ["ticker", "interval"],
+                "template": "{ticker} {interval} https://tv.com/?interval={interval_raw}",
+            },
+        }
+        file.write_text(json.dumps(data), encoding="utf-8")
+        monkeypatch.setattr(mod, "ALIASES_FILE", file)
+
+        result = mod.parse_alias("/chart BTCUSD 60")
+        assert result == "BTCUSD 1h https://tv.com/?interval=60"
+
+    def test_interval_raw_with_text_interval(self, tmp_path, monkeypatch):
+        """Text intervals (1D) — both {interval} and {interval_raw} get same value."""
+        import aliases as mod
+        file = tmp_path / "aliases.json"
+        data = {
+            "chart": {
+                "variables": ["ticker", "interval"],
+                "template": "{ticker} {interval} url={interval_raw}",
+            },
+        }
+        file.write_text(json.dumps(data), encoding="utf-8")
+        monkeypatch.setattr(mod, "ALIASES_FILE", file)
+
+        result = mod.parse_alias("/chart BTCUSD 1D")
+        assert result == "BTCUSD 1D url=1D"
+
+    def test_no_interval_no_raw(self, tmp_path, monkeypatch):
+        """Alias without interval variable — no {interval_raw} injection."""
+        import aliases as mod
+        file = tmp_path / "aliases.json"
+        data = {
+            "basic": {
+                "variables": ["ticker"],
+                "template": "{ticker} only",
+            },
+        }
+        file.write_text(json.dumps(data), encoding="utf-8")
+        monkeypatch.setattr(mod, "ALIASES_FILE", file)
+
+        result = mod.parse_alias("/basic BTCUSD")
+        assert result == "BTCUSD only"
 
 
 class TestReloadConfig:

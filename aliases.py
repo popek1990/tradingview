@@ -133,14 +133,14 @@ def parse_alias(text: str) -> str | None:
         )
 
     # Auto-convert interval variable to human-readable format
-    args = [
-        humanize_interval(a) if v == "interval" else a
-        for v, a in zip(variables, args)
-    ]
-
-    # Simultaneous replacement — prevents variable value injection
-    # (e.g., ticker="{exchange}" won't affect the {exchange} placeholder)
-    replacements = {f"{{{v}}}": a for v, a in zip(variables, args)}
+    # and inject {interval_raw} with original value (for TradingView chart URLs)
+    replacements = {}
+    for v, a in zip(variables, args):
+        if v == "interval":
+            replacements["{interval_raw}"] = a
+            replacements[f"{{{v}}}"] = humanize_interval(a)
+        else:
+            replacements[f"{{{v}}}"] = a
     if not replacements:
         return template
     pattern = "|".join(re.escape(k) for k in replacements)
