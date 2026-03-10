@@ -71,7 +71,7 @@ Fill in your credentials:
 ```env
 # ── Security ──────────────────────────────────────────────────────
 # SEC_KEY — must match the "key" field in your TradingView alert JSON.
-# Min 16 chars. Generate one with: python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+# Use any combination of letters and numbers, at least 16 characters.
 SEC_KEY=your_secret_key_here
 
 # DASHBOARD_PASSWORD — password to log into the admin panel (min 8 chars).
@@ -186,45 +186,73 @@ Rent a VPS ([Hetzner](https://www.hetzner.com/cloud), [DigitalOcean](https://www
 
 ## Setting Up TradingView Alerts
 
-### Method 1: JSON payload (recommended)
+### Step 1: Create your key
 
-Set webhook URL to `https://yourdomain.com/webhook` and the message to:
+Choose your own secret key — any combination of letters and numbers, **at least 16 characters** long. For example: `Abc123Xyz456Qwer` (do **not** use this example — create your own!).
+
+This key must be entered in **two places**:
+1. **On the server** — paste it into `SEC_KEY` in your `.env` file, or enter it in the Dashboard under **Configuration → Auth key for Webhooks**
+2. **In TradingView** — include it as the `"key"` field in every alert message (see Step 2)
+
+Both values must be **exactly the same**. If they don't match, the webhook will reject the alert.
+
+### Step 2: Create an alert in TradingView
+
+1. Open a chart on [TradingView](https://www.tradingview.com) and click **Alert** (clock icon or `Alt+A`)
+2. Set your trigger conditions (price crossing a level, indicator signal, etc.)
+3. Check **Webhook URL** and enter your server address:
+   ```
+   https://yourdomain.com/webhook
+   ```
+4. In the **Message** field, paste a JSON payload like this:
 
 ```json
 {
-  "key": "your_secret_key",
-  "msg": "Signal *#{{ticker}}* at price `{{close}}`"
-}
-```
-
-This is the **preferred method** — the key stays in the POST body and never appears in URLs or access logs.
-
-### Method 2: Alias with JSON body (recommended for aliases)
-
-Aliases let you use short commands instead of complex JSON. Define them in the dashboard under **Aliases**, then use them in TradingView:
-
-**Webhook URL:** `https://yourdomain.com/webhook`
-
-**Message:**
-```json
-{
-  "key": "your_secret_key",
+  "key": "Abc123Xyz456Qwer",
   "msg": "/spot {{ticker}} {{exchange}} {{close}}"
 }
 ```
 
-TradingView substitutes `{{ticker}}`, `{{exchange}}`, `{{close}}` with real values before sending. The webhook receives something like `/spot BTCUSDT BINANCE 68000` and expands it using the alias template.
+> Replace `Abc123Xyz456Qwer` with **your own key** (the same one you set as `SEC_KEY`).
+
+5. Click **Create**
+
+When the alert triggers, TradingView will replace `{{ticker}}`, `{{exchange}}`, `{{close}}` with real values (e.g. `BTCUSDT`, `BINANCE`, `68000`) and send the JSON to your webhook.
+
+### Message examples
+
+#### Plain text message
+
+```json
+{
+  "key": "Abc123Xyz456Qwer",
+  "msg": "Signal #{{ticker}} at price {{close}}"
+}
+```
+
+#### Using an alias
+
+Aliases let you use short commands instead of writing long messages. Define them in the Dashboard under **Aliases**, then reference them in TradingView:
+
+```json
+{
+  "key": "Abc123Xyz456Qwer",
+  "msg": "/spot {{ticker}} {{exchange}} {{close}}"
+}
+```
+
+TradingView sends something like `/spot BTCUSDT BINANCE 68000` — the webhook expands it using the alias template you defined.
 
 ![Alias in TradingView Message field](alias_example.png)
 ![Alias output in Telegram](alias_output_example.png)
 
-### Method 3: JSON with channel override
+#### Channel override
 
-Override default channels per alert:
+You can redirect any alert to a different Telegram group, Discord, or Slack channel by adding optional fields:
 
 ```json
 {
-  "key": "your_secret_key",
+  "key": "Abc123Xyz456Qwer",
   "msg": "VIP alert: {{ticker}} at {{close}}",
   "telegram": "-10018645640",
   "discord": "https://discord.com/api/webhooks/...",
@@ -232,11 +260,27 @@ Override default channels per alert:
 }
 ```
 
-### Method 4: Key in URL (deprecated, backwards compatible)
+### Available TradingView variables
 
-> **Deprecated:** This method exposes the key in the URL path, which may appear in access logs. Use Method 1 or 2 instead. This endpoint will be removed in a future version.
+You can use any [TradingView placeholder](https://www.tradingview.com/support/solutions/43000531021/) in the `"msg"` field. The most common ones:
 
-Set webhook URL to `https://yourdomain.com/webhook/your_secret_key` and the message to plain text:
+| Variable | Description | Example value |
+|---|---|---|
+| `{{ticker}}` | Symbol name | `BTCUSDT` |
+| `{{exchange}}` | Exchange name | `BINANCE` |
+| `{{close}}` | Current price | `68000` |
+| `{{open}}` | Open price | `67500` |
+| `{{high}}` | High price | `68500` |
+| `{{low}}` | Low price | `67000` |
+| `{{volume}}` | Volume | `1234.56` |
+| `{{interval}}` | Timeframe (readable) | `1h` |
+| `{{time}}` | Alert trigger time | `2024-01-15T12:30:00Z` |
+
+### Legacy method: Key in URL (deprecated)
+
+> **Deprecated:** This method exposes the key in the URL path, which may appear in access logs. Use the JSON method above instead.
+
+Set webhook URL to `https://yourdomain.com/webhook/Abc123Xyz456Qwer` and the message to plain text:
 
 ```
 /spot {{ticker}} {{exchange}} {{close}}
