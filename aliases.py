@@ -79,6 +79,25 @@ def save_aliases(aliases: dict) -> None:
     logger.info("Aliases saved (%d aliases)", len(aliases))
 
 
+def humanize_interval(value: str) -> str:
+    """Convert TradingView interval to human-readable format.
+
+    TradingView sends numeric minutes (e.g., "60") or text ("1D", "1W", "1M").
+    Converts: 1 → 1min, 60 → 1h, 240 → 4h, etc.
+    Text values (D/W/M) are returned unchanged.
+    """
+    if not value.isdigit():
+        return value
+
+    minutes = int(value)
+    if minutes < 60:
+        return f"{minutes}min"
+    hours, remainder = divmod(minutes, 60)
+    if remainder == 0:
+        return f"{hours}h"
+    return f"{hours}h{remainder}min"
+
+
 def parse_alias(text: str) -> str | None:
     """Parse alias command and render template.
 
@@ -112,6 +131,12 @@ def parse_alias(text: str) -> str | None:
             f"/{alias_name} expects {len(variables)} args "
             f"({', '.join(variables)}), got {len(args)}"
         )
+
+    # Auto-convert interval variable to human-readable format
+    args = [
+        humanize_interval(a) if v == "interval" else a
+        for v, a in zip(variables, args)
+    ]
 
     # Simultaneous replacement — prevents variable value injection
     # (e.g., ticker="{exchange}" won't affect the {exchange} placeholder)

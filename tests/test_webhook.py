@@ -253,6 +253,10 @@ class TestWebhookAliases:
                 "variables": [],
                 "template": "Fixed alert message",
             },
+            "withinterval": {
+                "variables": ["ticker", "interval"],
+                "template": "Alert {ticker} on {interval}",
+            },
         }
         file.write_text(json.dumps(data), encoding="utf-8")
         monkeypatch.setattr(mod, "ALIASES_FILE", file)
@@ -307,6 +311,18 @@ class TestWebhookAliases:
         assert resp.json()["detail"] == "Invalid request"
 
     @pytest.mark.asyncio
+    async def test_alias_interval_converted(self, client, monkeypatch):
+        """Alias with interval variable — numeric minutes converted to human form."""
+        monkeypatch.setenv("SEND_ALERTS_TELEGRAM", "False")
+        async with client as c:
+            resp = await c.post(
+                "/webhook/test_secret_key_123",
+                content="/withinterval BTCUSD 60",
+                headers={"content-type": "text/plain"},
+            )
+        assert resp.status_code == 200
+
+    @pytest.mark.asyncio
     async def test_alias_bad_key(self, client):
         """Alias with wrong key — 403 (key checked before alias)."""
         async with client as c:
@@ -316,6 +332,31 @@ class TestWebhookAliases:
                 headers={"content-type": "text/plain"},
             )
         assert resp.status_code == 403
+
+
+class TestHumanizeInterval:
+    """Unit tests for humanize_interval()."""
+
+    @pytest.mark.parametrize("raw,expected", [
+        ("1", "1min"),
+        ("5", "5min"),
+        ("15", "15min"),
+        ("30", "30min"),
+        ("45", "45min"),
+        ("60", "1h"),
+        ("120", "2h"),
+        ("240", "4h"),
+        ("360", "6h"),
+        ("720", "12h"),
+        ("90", "1h30min"),
+        ("1D", "1D"),
+        ("1W", "1W"),
+        ("1M", "1M"),
+        ("3M", "3M"),
+    ])
+    def test_humanize_interval(self, raw, expected):
+        from aliases import humanize_interval
+        assert humanize_interval(raw) == expected
 
 
 class TestReloadConfig:
