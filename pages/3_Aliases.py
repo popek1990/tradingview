@@ -99,7 +99,7 @@ if editing and editing in aliases:
     with st.form("form_edit_alias", border=True):
         new_name = st.text_input("ALIAS NAME (a-z, 0-9, _, -)", value=editing, max_chars=64)
         template = st.text_area("TEMPLATE CONTENT", value=aliases[editing]["template"],
-                                height=150, max_chars=4000,
+                                height=180, max_chars=4000,
                                 help="Use {variable} for placeholders, e.g. {ticker}")
         variables_str = st.text_input("VARIABLES (comma-separated)",
                                       value=", ".join(aliases[editing].get("variables", [])),
@@ -154,7 +154,7 @@ if not editing:
     with st.expander("Add", expanded=bool(st.session_state.new_alias_vars)):
       with st.form("form_new_alias", border=True):
         new_name = st.text_input("ALIAS NAME (a-z, 0-9, _, -)", max_chars=64)
-        new_template = st.text_area("TEMPLATE CONTENT", height=150, max_chars=4000,
+        new_template = st.text_area("TEMPLATE CONTENT", height=180, max_chars=4000,
                                     help="Use {variable} for placeholders, e.g. {ticker}")
         new_variables = st.text_input("VARIABLES (comma-separated)",
                                       value=st.session_state.new_alias_vars,
