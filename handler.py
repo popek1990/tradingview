@@ -64,11 +64,13 @@ def _get_group_name(bot: Bot, channel_id: str) -> str:
 def _tg_send_message(bot: Bot, channel: str, msg: str) -> None:
     """Sends Telegram message with Markdown, retries without formatting on parse error."""
     try:
-        bot.sendMessage(channel, msg, parse_mode="MARKDOWN", timeout=NETWORK_TIMEOUT)
+        bot.sendMessage(channel, msg, parse_mode="MARKDOWN", timeout=NETWORK_TIMEOUT,
+                       disable_web_page_preview=True)
     except TelegramError as e:
         if "parse" in str(e).lower() or "can't" in str(e).lower():
             logger.warning("Telegram: Markdown parse failed, retrying without formatting")
-            bot.sendMessage(channel, msg, timeout=NETWORK_TIMEOUT)
+            bot.sendMessage(channel, msg, timeout=NETWORK_TIMEOUT,
+                           disable_web_page_preview=True)
         else:
             raise
 
