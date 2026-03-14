@@ -1,6 +1,22 @@
 {
-  "spot": {
-    "variables": ["ticker", "exchange", "close"],
-    "template": "🎯 *Target* #{ticker} on *{exchange}* ✔️\n\n🎯 *${ticker}* reached price *{close}* ✔️\n\n_...Popek, stay disciplined! You planned this. Execute!_"
+  "strong": {
+    "template": "🚨 *Target* ${ticker} na interwale *{interval}*\n\n     ✅ Cena *${close}* osiągnięta!\n\n              ❗️ _Strong Signal_ ❗️\n\n🔗 [Tradingview](https://www.tradingview.com/chart/?symbol={exchange}:{ticker}&interval={interval_raw})",
+    "variables": ["ticker", "close", "interval", "exchange"]
+  },
+  "target": {
+    "template": "  🎯 *Target* {ticker} na interwale *{interval}*\n\n  ✅ Cena *${close}* osiągnięta!\n\n  _...Wyłapało? 🤔_\n\n  🔗 [Tradingview](https://www.tradingview.com/chart/?symbol={exchange}:{ticker}&interval={interval_raw})\n",
+    "variables": ["ticker", "close", "interval", "exchange"]
+  },
+  "stoploss": {
+    "template": "⛔️ _Stop loss_ ⛔️\n\n  *Wybiło* SL ${ticker} przy cenie *${close}*\n\n  _Mówi się trudno, i jedzie dalej... ;)_\n\n  🔗 [Tradingview](https://www.tradingview.com/chart/?symbol={exchange}:{ticker}&interval={interval_raw})",
+    "variables": ["ticker", "exchange", "close", "interval"]
+  },
+  "poponachi": {
+    "template": "  🌀 *Poponachi* 🌀\n\n  ${ticker} na interwale *{interval}*\n\n  ✅ Dojechało do ceny *${close}* poziomu poponachi!\n\n  _Blisko poponachi, gram?_\n\n  🔗 [Tradingview](https://www.tradingview.com/chart/?symbol={exchange}:{ticker}&interval={interval_raw})",
+    "variables": ["ticker", "exchange", "close", "interval"]
+  },
+  "wylamanie": {
+    "template": "👀 *Wyłamanie* 👀\n\n📈 *Cena tokena* ${ticker} na interwale *{interval}*\n\n✅ Cena *${close}* osiągnięta!\n\n_...Gram tego swinga? 🤔_\n\n🔗 [Tradingview](https://www.tradingview.com/chart/?symbol={exchange}:{ticker}&interval={interval_raw})",
+    "variables": ["ticker", "close", "interval", "exchange"]
   }
 }
