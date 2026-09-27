@@ -3,6 +3,7 @@
 # File                   : config.py               #
 # ----------------------------------------------- #
 
+import hashlib
 import logging
 import threading
 
@@ -30,6 +31,7 @@ class Settings(BaseSettings):
     tg_token: str = ""
     channel: str = ""
     channel_2: str = ""            # Second Telegram group (optional)
+    admin_chat: str = ""           # Telegram chat for technical warnings (optional)
 
     # Discord settings
     send_alerts_discord: bool = False
@@ -38,6 +40,14 @@ class Settings(BaseSettings):
     # Slack settings
     send_alerts_slack: bool = False
     slack_webhook: str = ""
+
+    # Trusted hosts (comma-separated, empty = allow all). Applied at startup only.
+    allowed_hosts: str = ""
+
+
+def settings_fingerprint(settings: Settings) -> str:
+    """Short hash of all settings — lets the panel verify a reload took effect."""
+    return hashlib.sha256(settings.model_dump_json().encode()).hexdigest()[:16]
 
 
 # Thread-safe singleton with reload capability

@@ -9,9 +9,6 @@ import hmac
 import ipaddress
 import json
 import logging
-
-from dotenv import load_dotenv
-load_dotenv()  # Load .env into os.environ (needed for ALLOWED_HOSTS etc.)
 import logging.handlers
 import os
 import uuid
@@ -25,8 +22,8 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.responses import JSONResponse
 
 from aliases import parse_alias
-from config import get_settings, reload_settings
-from handler import send_alert
+from config import get_settings, reload_settings, settings_fingerprint
+from handler import notify_admin, send_alert
 from templates import render
 
 # Logging
@@ -121,7 +118,9 @@ app.state.limiter = limiter
 
 # Trusted Host middleware — defaults to "*" (allow all) for easy setup.
 # Set ALLOWED_HOSTS in .env to restrict (e.g. "yourdomain.com,localhost,webhook").
-_allowed_hosts_env = os.getenv("ALLOWED_HOSTS", "")
+# .env is read through Settings, never copied into os.environ: env vars take
+# precedence over the file, so a copy would make /reload-config a no-op.
+_allowed_hosts_env = get_settings().allowed_hosts
 if _allowed_hosts_env.strip():
     _allowed_hosts = [h.strip() for h in _allowed_hosts_env.split(",")]
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=_allowed_hosts)
@@ -254,14 +253,21 @@ async def _handle_webhook(request: Request, key_from_url: str | None) -> dict:
         raise HTTPException(status_code=403, detail="Invalid key")
 
     # Alias handling (e.g., "/spot BTCUSDT BINANCE 68000")
+    alias_error: str | None = None
     if msg and msg.startswith("/"):
         try:
             alias_result = parse_alias(msg)
             if alias_result is not None:
                 msg = alias_result
         except (KeyError, ValueError) as e:
-            logger.warning("Alias error from %s: %s", get_client_ip(request), e)
-            raise HTTPException(status_code=400, detail="Invalid request")
+            # Don't drop the signal: forward the raw text with the reason
+            # (to ADMIN_CHAT if configured, otherwise to the normal channels)
+            alias_error = str(e.args[0]) if e.args else str(e)
+            logger.warning("Alias error from %s: %s", get_client_ip(request), alias_error)
+            warning = f"⚠️ Alert nie pasuje do aliasu: {alias_error}"
+            if await asyncio.to_thread(notify_admin, f"{warning}\n\nSurowa treść z TradingView:\n{msg}"):
+                return {"status": "warning", "detail": "Alias error — forwarded to admin chat"}
+            msg = f"{warning}\n\nSurowa treść z TradingView:\n```\n{msg}\n```"
 
     # Template handling
     if template_name:
@@ -293,6 +299,8 @@ async def _handle_webhook(request: Request, key_from_url: str | None) -> dict:
         logger.error("All channels failed: %s", results)
         raise HTTPException(status_code=502, detail="All channels failed")
 
+    if alias_error:
+        return {"status": "warning", "detail": "Alias error — raw message forwarded", "channels": results}
     return {"status": "ok", "channels": results}
 
 
@@ -361,6 +369,6 @@ async def reload_config(request: Request):
     ):
         raise HTTPException(status_code=403, detail="Invalid key")
 
-    reload_settings()
+    new_settings = reload_settings()
     logger.info("Configuration reloaded on request from panel")
-    return {"status": "ok"}
+    return {"status": "ok", "fingerprint": settings_fingerprint(new_settings)}

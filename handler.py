@@ -8,6 +8,7 @@ import logging
 import re
 import textwrap
 import threading
+import time
 from typing import Any
 from urllib.parse import urlparse
 
@@ -31,6 +32,18 @@ _tg_bot_cache: tuple[str, Bot] | None = None
 _tg_names_lock = threading.Lock()
 _tg_names_cache: collections.OrderedDict[str, str] = collections.OrderedDict()
 _TG_NAMES_MAX = 256
+
+# Admin warnings — at most one per key per hour (thread-safe)
+_admin_lock = threading.Lock()
+_admin_last_sent: dict[str, float] = {}
+ADMIN_WARN_INTERVAL = 3600  # seconds
+
+_CHANNEL_LABELS = {
+    "telegram": "Telegram 1",
+    "telegram_2": "Telegram 2",
+    "discord": "Discord",
+    "slack": "Slack",
+}
 
 
 def _get_tg_bot(token: str) -> Bot:
@@ -58,6 +71,11 @@ def _get_group_name(bot: Bot, channel_id: str) -> str:
                 _tg_names_cache.popitem(last=False)  # evict oldest
         return name
     except Exception:
+        # Cache the failure too — otherwise every alert repeats a failing API call
+        with _tg_names_lock:
+            _tg_names_cache[channel_id] = channel_id
+            if len(_tg_names_cache) > _TG_NAMES_MAX:
+                _tg_names_cache.popitem(last=False)
         return channel_id
 
 
@@ -73,6 +91,35 @@ def _tg_send_message(bot: Bot, channel: str, msg: str) -> None:
                            disable_web_page_preview=True)
         else:
             raise
+
+
+def notify_admin(text: str, key: str | None = None) -> bool:
+    """Sends a technical warning to ADMIN_CHAT (plain text, no Markdown).
+
+    With `key`, the same warning is sent at most once per ADMIN_WARN_INTERVAL.
+    Returns True if the message was sent.
+    """
+    settings = get_settings()
+    admin_chat = str(settings.admin_chat).strip()
+    if not settings.tg_token or not re.match(r"^-?\d+$", admin_chat):
+        return False
+
+    if key is not None:
+        now = time.monotonic()
+        with _admin_lock:
+            last = _admin_last_sent.get(key)
+            if last is not None and now - last < ADMIN_WARN_INTERVAL:
+                return False
+            _admin_last_sent[key] = now
+
+    try:
+        _get_tg_bot(settings.tg_token).sendMessage(
+            admin_chat, text, timeout=NETWORK_TIMEOUT, disable_web_page_preview=True,
+        )
+        return True
+    except Exception as e:
+        logger.error("Admin chat: %s", e)
+        return False
 
 
 def _validate_webhook_url(url: str, expected_host: str, expected_prefix: str) -> bool:
@@ -96,6 +143,7 @@ def send_alert(data: dict[str, Any]) -> dict[str, bool]:
     settings = get_settings()
     msg = data["msg"]
     results: dict[str, bool] = {}
+    errors: dict[str, str] = {}
 
     if settings.send_alerts_telegram:
         try:
@@ -113,6 +161,7 @@ def send_alert(data: dict[str, Any]) -> dict[str, bool]:
         except Exception as e:
             logger.error("Telegram: %s", e)
             results["telegram"] = False
+            errors["telegram"] = str(e)
 
     # Second Telegram group
     if settings.send_alerts_telegram_2 and settings.channel_2:
@@ -131,6 +180,7 @@ def send_alert(data: dict[str, Any]) -> dict[str, bool]:
         except Exception as e:
             logger.error("Telegram 2: %s", e)
             results["telegram_2"] = False
+            errors["telegram_2"] = str(e)
 
     if settings.send_alerts_discord:
         try:
@@ -181,6 +231,7 @@ def send_alert(data: dict[str, Any]) -> dict[str, bool]:
         except Exception as e:
             logger.error("Discord: %s", e)
             results["discord"] = False
+            errors["discord"] = type(e).__name__  # str(e) may contain the webhook URL
 
     if settings.send_alerts_slack:
         try:
@@ -216,5 +267,17 @@ def send_alert(data: dict[str, Any]) -> dict[str, bool]:
         except Exception as e:
             logger.error("Slack: %s", e)
             results["slack"] = False
+            errors["slack"] = type(e).__name__  # str(e) may contain the webhook URL
+
+    # A failing channel must not go unnoticed just because another one worked
+    for name, ok in results.items():
+        if not ok:
+            label = _CHANNEL_LABELS.get(name, name)
+            reason = errors.get(name, "szczegóły w logach")
+            notify_admin(
+                f"⚠️ {label}: alert nie został dostarczony ({reason}). "
+                f"Kolejne ostrzeżenie o tym kanale najwcześniej za godzinę.",
+                key=f"channel:{name}",
+            )
 
     return results

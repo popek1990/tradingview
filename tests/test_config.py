@@ -46,3 +46,30 @@ class TestSingleton:
         s2 = reload_settings()
         assert s1 is not s2
         assert s2.sec_key == "new_key_at_least_16"
+
+
+class TestReloadFromFile:
+    """B1 regression: panel edits the .env FILE, reload must pick that up."""
+
+    def test_reload_reads_changed_file(self, monkeypatch, tmp_path):
+        monkeypatch.delenv("SEC_KEY", raising=False)
+        monkeypatch.delenv("SEND_ALERTS_TELEGRAM_2", raising=False)
+        env = tmp_path / ".env"
+        env.write_text('SEC_KEY="old_key_at_least_16"\nSEND_ALERTS_TELEGRAM_2=True\n')
+        assert get_settings().sec_key == "old_key_at_least_16"
+
+        env.write_text('SEC_KEY="new_key_at_least_16"\nSEND_ALERTS_TELEGRAM_2=False\n')
+        s = reload_settings()
+        assert s.sec_key == "new_key_at_least_16"
+        assert s.send_alerts_telegram_2 is False
+
+    def test_main_does_not_copy_env_file_into_environ(self):
+        """A copy in os.environ would shadow later edits of the file."""
+        import main
+        assert not hasattr(main, "load_dotenv")
+
+    def test_fingerprint_changes_with_settings(self, monkeypatch):
+        from config import settings_fingerprint
+        before = settings_fingerprint(Settings())
+        monkeypatch.setenv("CHANNEL_2", "-100777")
+        assert settings_fingerprint(Settings()) != before

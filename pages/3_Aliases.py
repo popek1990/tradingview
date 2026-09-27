@@ -85,6 +85,11 @@ if "confirm_delete_alias" not in st.session_state:
 if "just_saved_alias" not in st.session_state:
     st.session_state.just_saved_alias = None
 
+# Warning from the last save — survives the st.rerun() that follows saving
+_var_warning = st.session_state.pop("alias_var_warning", None)
+if _var_warning:
+    st.warning(f"SAVED, BUT VARIABLE MISMATCH — {_var_warning}")
+
 # --- Editor at the top when editing ---
 editing = st.session_state.edit_alias
 if editing and editing in aliases:
@@ -127,7 +132,8 @@ if editing and editing in aliases:
                 st.stop()
             var_warning = _check_template_vars(template, parsed_vars)
             if var_warning:
-                st.warning(f"Variable mismatch: {var_warning}")
+                # Shown after st.rerun() below — a plain st.warning would be wiped
+                st.session_state.alias_var_warning = f"/{name_to_save}: {var_warning}"
             with get_aliases_lock():
                 aliases = load_aliases_unlocked()
                 if name_to_save != editing:
@@ -189,7 +195,8 @@ if not editing:
                 st.stop()
             var_warning = _check_template_vars(new_template, parsed_vars)
             if var_warning:
-                st.warning(f"Variable mismatch: {var_warning}")
+                # Shown after st.rerun() below — a plain st.warning would be wiped
+                st.session_state.alias_var_warning = f"/{name_to_save}: {var_warning}"
             with get_aliases_lock():
                 aliases = load_aliases_unlocked()
                 aliases[name_to_save] = {

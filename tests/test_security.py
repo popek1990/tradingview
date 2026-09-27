@@ -241,28 +241,28 @@ class TestGenericErrorMessages:
 
     @pytest.mark.asyncio
     async def test_alias_error_generic_message(self, client):
-        """Unknown alias returns generic 'Invalid request', not internal details."""
+        """Unknown alias — response carries no internal details."""
         async with client as c:
             resp = await c.post(
                 "/webhook/test_secret_key_123",
                 content="/nonexistent",
                 headers={"content-type": "text/plain"},
             )
-        assert resp.status_code == 400
-        assert resp.json()["detail"] == "Invalid request"
-        assert "Unknown alias" not in resp.json()["detail"]
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "warning"
+        assert "Unknown alias" not in resp.text
 
     @pytest.mark.asyncio
     async def test_alias_wrong_args_generic_message(self, client):
-        """Wrong arg count returns generic 'Invalid request'."""
+        """Wrong arg count — response carries no internal details."""
         async with client as c:
             resp = await c.post(
                 "/webhook/test_secret_key_123",
                 content="/spot BTCUSDT",
                 headers={"content-type": "text/plain"},
             )
-        assert resp.status_code == 400
-        assert resp.json()["detail"] == "Invalid request"
+        assert resp.status_code == 200
+        assert "expects" not in resp.text
 
 
 class TestDeprecationWarning:

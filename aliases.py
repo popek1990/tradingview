@@ -89,6 +89,31 @@ def save_aliases(aliases: dict) -> None:
 
 
 PRICE_VARIABLES = {"close", "open", "high", "low"}
+NUMERIC_VARIABLES = PRICE_VARIABLES | {"volume"}
+# TradingView {{interval}}: minutes ("60"), seconds ("15S") or D/W/M ("1D", "W")
+REGEX_INTERVAL = re.compile(r"^(\d+[SDWM]?|[SDWM])$", re.IGNORECASE)
+
+
+def validate_argument(variable: str, value: str) -> None:
+    """Checks that an argument looks like its variable (catches swapped order).
+
+    Aliases take positional arguments, so a TradingView message written for
+    another alias would otherwise render e.g. an interval as the price.
+    Raises ValueError on mismatch.
+    """
+    if variable in NUMERIC_VARIABLES:
+        try:
+            num = float(value)
+        except ValueError:
+            num = None
+        if num is None or num != num or num in (float("inf"), float("-inf")):
+            raise ValueError(f"'{variable}' must be a number, got '{value}'")
+    elif variable == "interval":
+        if not REGEX_INTERVAL.match(value):
+            raise ValueError(f"'interval' must look like 60, 1D, W…, got '{value}'")
+    elif variable == "exchange":
+        if not re.search(r"[A-Za-z]", value):
+            raise ValueError(f"'exchange' must contain letters, got '{value}'")
 
 
 def format_price(value: str) -> str:
@@ -100,6 +125,8 @@ def format_price(value: str) -> str:
         num = float(value)
     except (ValueError, OverflowError):
         return value
+    if "e" in value.lower():
+        return value  # scientific notation (e.g. 1e-05) — leave as sent
 
     if num == int(num) and "." not in value or value.endswith(".00") or value.endswith(".0"):
         formatted = f"{int(num):,}".replace(",", " ")
@@ -166,6 +193,9 @@ def parse_alias(text: str) -> str | None:
 
     # Auto-convert interval variable to human-readable format
     # and inject {interval_raw} with original value (for TradingView chart URLs)
+    for v, a in zip(variables, args):
+        validate_argument(v, a)
+
     replacements = {}
     for v, a in zip(variables, args):
         if v == "interval":

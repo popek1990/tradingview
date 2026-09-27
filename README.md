@@ -13,6 +13,7 @@ Built with FastAPI + Streamlit, deployed via Docker Compose.
 - **Multi-channel alerts** — Telegram (up to 2 groups), Discord, and Slack simultaneously
 - **Alias system** — short commands like `/spot {{ticker}} {{exchange}} {{close}}` instead of complex JSON
 - **Admin dashboard** — configure channels, manage aliases, send test alerts, view logs
+- **Admin chat** — optional `ADMIN_CHAT` gets alerts that failed alias parsing and warnings about failing channels
 - **Dynamic channel override** — redirect any alert to a different channel directly from the payload
 - **Security** — HMAC key validation, rate limiting, SSRF protection, brute-force lockout
 
@@ -103,6 +104,8 @@ In the alias template, write variables in single curly braces — `{ticker}`, `{
 
 Square brackets such as `[ticker]` are never substituted, so the dashboard refuses to save a template that uses them for a declared variable.
 
+Arguments are positional, so their order must match the alias's variable list. The webhook checks that `close`/`open`/`high`/`low`/`volume` are numbers, `interval` looks like `60`, `1D` or `W`, and `exchange` contains letters. If an alert doesn't fit its alias (unknown alias, wrong number of arguments, or swapped order), the signal is not dropped: the raw text is forwarded with a ⚠️ reason — to `ADMIN_CHAT` if set, otherwise to the normal channels.
+
 ![Alias in TradingView Message field](alias_example.png)
 ![Alias output in Telegram](alias_output_example.png)
 
@@ -145,7 +148,7 @@ You can use any [TradingView placeholder](https://www.tradingview.com/support/so
 | `/webhook` | POST | Receive alerts (key in JSON body) |
 | `/webhook/{key}` | POST | Receive alerts (key in URL) — **deprecated** |
 | `/health` | GET | Health check |
-| `/reload-config` | POST | Hot-reload settings from `.env` (internal network only) |
+| `/reload-config` | POST | Hot-reload settings from `.env` (internal network only); returns a fingerprint the dashboard uses to confirm the reload applied. `ALLOWED_HOSTS` still needs a restart |
 
 ---
 

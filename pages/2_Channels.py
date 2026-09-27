@@ -38,6 +38,13 @@ with st.form("form_channels", border=True):
         channel_2 = st.text_input("Chat ID", value=settings.channel_2, key="grp2_input",
                                   help="Paste the chat ID from @ShowJsonBot")
 
+    st.markdown("#### ADMIN CHAT (technical warnings)")
+    admin_chat = st.text_input(
+        "Chat ID", value=settings.admin_chat, key="admin_input",
+        help="Your private chat with the bot (send it /start first). Receives "
+             "alerts that don't match an alias and failing-channel warnings "
+             "(max 1 per channel per hour). Leave empty to disable.")
+
     st.markdown("---")
     # Toggle on/off only — secrets (webhook URL) editable only in Configuration
     col_dc, col_sl = st.columns(2)
@@ -66,7 +73,7 @@ with st.form("form_channels", border=True):
 
 if submit:
     # Validate Telegram Chat IDs (must be numeric, negative for groups)
-    for label, val in [("Channel 1", channel), ("Channel 2", channel_2)]:
+    for label, val in [("Channel 1", channel), ("Channel 2", channel_2), ("Admin chat", admin_chat)]:
         val = val.strip()
         if val and not re.match(r"^-?\d+$", val):
             st.error(f"{label}: Chat ID must be numeric (e.g. -5112822251)")
@@ -78,6 +85,7 @@ if submit:
         "SEND_ALERTS_TELEGRAM_2": str(tg_enabled_2),
         "CHANNEL": channel.strip(),
         "CHANNEL_2": channel_2.strip(),
+        "ADMIN_CHAT": admin_chat.strip(),
         "SEND_ALERTS_DISCORD": str(dc_enabled),
         "SEND_ALERTS_SLACK": str(sl_enabled),
     }

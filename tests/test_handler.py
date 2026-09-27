@@ -164,3 +164,49 @@ class TestSendAlert:
 
         assert results["discord"] is True
         mock_wh.add_embed.assert_called_once()
+
+
+class TestAdminWarnings:
+    """B6: failing channels are reported to ADMIN_CHAT, rate-limited."""
+
+    @patch("handler._get_tg_bot")
+    def test_failed_channel_notifies_admin_once(self, mock_bot, monkeypatch):
+        monkeypatch.setenv("SEND_ALERTS_TELEGRAM", "True")
+        monkeypatch.setenv("SEND_ALERTS_TELEGRAM_2", "True")
+        monkeypatch.setenv("CHANNEL_2", "-751000")
+        monkeypatch.setenv("ADMIN_CHAT", "12345")
+        bot = MagicMock()
+
+        def send(chat, *args, **kwargs):
+            if chat == "-751000":
+                raise Exception("Chat not found")
+        bot.sendMessage.side_effect = send
+        mock_bot.return_value = bot
+
+        results = send_alert({"msg": "a"})
+        send_alert({"msg": "b"})
+
+        assert results == {"telegram": True, "telegram_2": False}
+        admin_calls = [c for c in bot.sendMessage.call_args_list if c[0][0] == "12345"]
+        assert len(admin_calls) == 1
+        assert "Telegram 2" in admin_calls[0][0][1]
+        assert "Chat not found" in admin_calls[0][0][1]
+
+    @patch("handler._get_tg_bot")
+    def test_no_admin_chat_no_warning(self, mock_bot, monkeypatch):
+        from handler import notify_admin
+        mock_bot.return_value = MagicMock()
+        assert notify_admin("x") is False
+        mock_bot.return_value.sendMessage.assert_not_called()
+
+    @patch("handler._get_tg_bot")
+    def test_failed_get_chat_is_cached(self, mock_bot, monkeypatch):
+        monkeypatch.setenv("SEND_ALERTS_TELEGRAM", "True")
+        bot = MagicMock()
+        bot.get_chat.side_effect = Exception("Chat not found")
+        mock_bot.return_value = bot
+
+        send_alert({"msg": "a"})
+        send_alert({"msg": "b"})
+
+        assert bot.get_chat.call_count == 1

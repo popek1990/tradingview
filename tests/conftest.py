@@ -16,6 +16,7 @@ TEST_ENV = {
     "SEND_ALERTS_DISCORD": "False",
     "SEND_ALERTS_SLACK": "False",
     "CHANNEL_2": "",
+    "ADMIN_CHAT": "",
     "DISCORD_WEBHOOK": "",
     "SLACK_WEBHOOK": "",
 }
@@ -31,6 +32,8 @@ def _clear_singleton():
     handler._tg_bot_cache = None
     with handler._tg_names_lock:
         handler._tg_names_cache.clear()
+    with handler._admin_lock:
+        handler._admin_last_sent.clear()
     yield
     config._settings = None
 

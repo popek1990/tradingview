@@ -287,28 +287,52 @@ class TestWebhookAliases:
         assert resp.status_code == 200
 
     @pytest.mark.asyncio
-    async def test_alias_unknown(self, client):
-        """Unknown alias — 400 with generic error (no internal details)."""
+    async def test_alias_unknown_forwarded_to_channels(self, client, monkeypatch):
+        """Unknown alias — raw text with a warning goes to channels, not dropped."""
+        sent = []
+        monkeypatch.setattr("main.send_alert", lambda data: sent.append(data) or {"telegram": True})
         async with client as c:
             resp = await c.post(
                 "/webhook/test_secret_key_123",
-                content="/nonexistent",
+                content="/swing BTCUSDT 69000",
                 headers={"content-type": "text/plain"},
             )
-        assert resp.status_code == 400
-        assert resp.json()["detail"] == "Invalid request"
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "warning"
+        assert "Unknown alias: /swing" in sent[0]["msg"]
+        assert "/swing BTCUSDT 69000" in sent[0]["msg"]
 
     @pytest.mark.asyncio
-    async def test_alias_wrong_arg_count(self, client):
-        """Alias with wrong number of args — 400 with generic error."""
+    async def test_alias_error_goes_to_admin_chat(self, client, monkeypatch):
+        """With ADMIN_CHAT configured the raw alert goes only there."""
+        admin, sent = [], []
+        monkeypatch.setattr("main.notify_admin", lambda text, key=None: admin.append(text) or True)
+        monkeypatch.setattr("main.send_alert", lambda data: sent.append(data) or {"telegram": True})
         async with client as c:
             resp = await c.post(
                 "/webhook/test_secret_key_123",
                 content="/spot BTCUSDT",
                 headers={"content-type": "text/plain"},
             )
-        assert resp.status_code == 400
-        assert resp.json()["detail"] == "Invalid request"
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "warning"
+        assert "expects 3 args" in admin[0] and "/spot BTCUSDT" in admin[0]
+        assert sent == []
+
+    @pytest.mark.asyncio
+    async def test_alias_swapped_arguments_not_rendered(self, client, monkeypatch):
+        """Arguments in another alias's order — warning instead of a wrong price."""
+        sent = []
+        monkeypatch.setattr("main.send_alert", lambda data: sent.append(data) or {"telegram": True})
+        async with client as c:
+            resp = await c.post(
+                "/webhook/test_secret_key_123",
+                content="/spot BTCUSDT 69000 BINANCE",
+                headers={"content-type": "text/plain"},
+            )
+        assert resp.json()["status"] == "warning"
+        assert "'exchange' must contain letters" in sent[0]["msg"]
+        assert "Target #" not in sent[0]["msg"]
 
     @pytest.mark.asyncio
     async def test_alias_interval_converted(self, client, monkeypatch):
@@ -447,6 +471,32 @@ class TestFindBracketedVars:
         assert find_bracketed_vars(template, ["ticker", "exchange"]) == []
 
 
+class TestValidateArgument:
+    """Unit tests for validate_argument() — catches swapped positional args."""
+
+    @pytest.mark.parametrize("var,value", [
+        ("close", "0.0964"), ("close", "69000"), ("volume", "1.5e6"),
+        ("interval", "60"), ("interval", "1D"), ("interval", "W"), ("interval", "15S"),
+        ("exchange", "BINANCE"), ("ticker", "RAYSOLUSDT.P"),
+    ])
+    def test_valid(self, var, value):
+        from aliases import validate_argument
+        validate_argument(var, value)
+
+    @pytest.mark.parametrize("var,value", [
+        ("close", "BINANCE"), ("close", "nan"), ("interval", "0.0964"),
+        ("interval", "BINANCE"), ("exchange", "60"),
+    ])
+    def test_invalid(self, var, value):
+        from aliases import validate_argument
+        with pytest.raises(ValueError):
+            validate_argument(var, value)
+
+    def test_scientific_price_not_mangled(self):
+        from aliases import format_price
+        assert format_price("1e-05") == "1e-05"
+
+
 class TestReloadConfig:
     @pytest.mark.asyncio
     async def test_valid_reload(self, client):
@@ -456,6 +506,8 @@ class TestReloadConfig:
                 "key": "test_secret_key_123",
             })
         assert resp.status_code == 200
+        from config import Settings, settings_fingerprint
+        assert resp.json()["fingerprint"] == settings_fingerprint(Settings())
 
     @pytest.mark.asyncio
     async def test_bad_key_reload(self, client):

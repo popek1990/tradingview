@@ -6,7 +6,7 @@ import re
 import requests
 import streamlit as st
 
-from config import Settings
+from config import Settings, settings_fingerprint
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +102,9 @@ def save_and_reload(fields: dict) -> None:
     logger.info("Dashboard config change: updated keys [%s]", ", ".join(fields.keys()))
 
     st.success("CONFIGURATION PERSISTED TO .ENV")
+    if "SEC_KEY" in fields and fields["SEC_KEY"] != old_sec_key:
+        st.warning("SEC_KEY CHANGED — update the key in every TradingView alert, "
+                   "alerts with the old key will now be rejected (403)")
     st.toast("Persisted!")
 
     try:
@@ -111,7 +114,11 @@ def save_and_reload(fields: dict) -> None:
             timeout=5,
         )
         if resp.status_code == 200:
-            st.success("WEBHOOK SERVER: CONFIG RELOADED")
+            expected = settings_fingerprint(Settings())
+            if resp.json().get("fingerprint") == expected:
+                st.success("WEBHOOK SERVER: CONFIG RELOADED")
+            else:
+                st.warning("WEBHOOK SERVER: RELOAD DID NOT APPLY — run `docker restart TView_to_social`")
         else:
             st.warning(f"WEBHOOK SERVER: RELOAD FAILED (HTTP {resp.status_code})")
     except Exception:
