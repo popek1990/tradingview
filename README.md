@@ -29,6 +29,8 @@ nano .env          # fill in your credentials (see comments inside)
 ./docker.sh        # or: docker compose up -d --build
 ```
 
+`docker.sh` (run as root) pulls, backs up aliases to `backups/`, sets `.env` to owner UID 1000 with mode 600, builds while the old containers keep receiving alerts, then restarts.
+
 After launch:
 - **Webhook:** `http://localhost:80` (must be publicly accessible for TradingView)
 - **Dashboard:** `http://localhost:8501` (password-protected)
@@ -152,7 +154,17 @@ You can use any [TradingView placeholder](https://www.tradingview.com/support/so
 
 ---
 
+## Dashboard notes
+
+- **Configuration** never shows stored secrets — fields start empty and an empty field keeps the current value.
+- **Aliases → Backup** exports and imports all aliases as JSON (they live only in the `data` Docker volume). The TradingView JSON with `SEC_KEY` appears only after clicking *Show TradingView JSON*.
+- **Logs** shows the webhook log and the panel log (`logs/dashboard.log`: logins, failed logins, config changes).
+
+---
+
 ## Running Without Docker
+
+`requirements-webhook.txt` and `requirements-dashboard.txt` are what the Docker images install; `requirements.txt` pulls in both plus the test tools.
 
 ```bash
 pip install -r requirements.txt

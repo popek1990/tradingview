@@ -18,6 +18,7 @@ import os
 import re
 import tempfile
 import threading
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -119,23 +120,23 @@ def validate_argument(variable: str, value: str) -> None:
 def format_price(value: str) -> str:
     """Format price with space as thousands separator, strip trailing .00.
 
-    69000.00 → 69 000, 0.0964 → 0.0964, 1234.50 → 1 234.50, abc → abc
+    69000.00 → 69 000, 0.0964 → 0.0964, 1234.50 → 1 234.50, -0.5 → -0.5.
+    Anything else (abc, inf, 1e-05) is returned unchanged — never raises.
     """
+    text = value.strip()
     try:
-        num = float(value)
-    except (ValueError, OverflowError):
+        number = Decimal(text)
+    except InvalidOperation:
         return value
-    if "e" in value.lower():
-        return value  # scientific notation (e.g. 1e-05) — leave as sent
+    if not number.is_finite() or "e" in text.lower():
+        return value
 
-    if num == int(num) and "." not in value or value.endswith(".00") or value.endswith(".0"):
-        formatted = f"{int(num):,}".replace(",", " ")
-    else:
-        int_part, dec_part = value.split(".")
-        int_formatted = f"{int(int_part):,}".replace(",", " ")
-        formatted = f"{int_formatted}.{dec_part}"
-
-    return formatted
+    sign = "-" if text.startswith("-") else ""
+    int_part, _, dec_part = text.lstrip("+-").partition(".")
+    if set(dec_part) <= {"0"}:
+        dec_part = ""  # 69000.00 → 69000
+    int_formatted = f"{int(int_part or '0'):,}".replace(",", " ")
+    return sign + int_formatted + (f".{dec_part}" if dec_part else "")
 
 
 def humanize_interval(value: str) -> str:

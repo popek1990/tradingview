@@ -1,18 +1,55 @@
+import fcntl
 import html
+import io
 import logging
+import logging.handlers
 import os
 import re
 
 import requests
 import streamlit as st
+from dotenv import dotenv_values
 
 from config import Settings, settings_fingerprint
 
 logger = logging.getLogger(__name__)
 
+DASHBOARD_LOG_PATH = "logs/dashboard.log"
+
+
+def _setup_dashboard_logging() -> None:
+    """Sends panel logs (config changes, logins) to logs/dashboard.log.
+
+    Idempotent — Streamlit re-imports pages on every rerun.
+    """
+    root = logging.getLogger()
+    if any(getattr(h, "_dashboard_log", False) for h in root.handlers):
+        return
+    try:
+        os.makedirs("logs", mode=0o750, exist_ok=True)
+        handler = logging.handlers.RotatingFileHandler(
+            DASHBOARD_LOG_PATH, maxBytes=2_000_000, backupCount=2, encoding="utf-8")
+    except OSError:
+        return  # read-only or missing logs dir (e.g. tests) — keep running
+    handler.setFormatter(logging.Formatter(
+        "%(asctime)s [%(levelname)s] %(name)s: %(message)s", "%Y-%m-%d %H:%M:%S"))
+    handler.setLevel(logging.INFO)
+    handler._dashboard_log = True
+    root.addHandler(handler)
+    if root.level > logging.INFO:
+        root.setLevel(logging.INFO)
+
+
+_setup_dashboard_logging()
+
 # Shared constants — single source of truth for frontend
 WEBHOOK_URL = os.getenv("WEBHOOK_URL", "http://localhost:80")
 ENV_FILE_PATH = ".env"
+
+
+def _quote_env_value(value: str) -> str:
+    """Single-quotes a value for .env; python-dotenv unescapes only \\ and \'."""
+    return "'" + value.replace("\\", "\\\\").replace("'", "\\'") + "'"
 
 
 def _set_env_key(filepath: str, key: str, value: str) -> bool:
@@ -20,39 +57,44 @@ def _set_env_key(filepath: str, key: str, value: str) -> bool:
 
     python-dotenv's set_key() uses tempfile + os.replace() which fails
     on Docker bind-mounted files (OSError: Device or resource busy).
-    This writes directly to the file to avoid that issue.
+    This writes directly to the file under an exclusive lock, then reads the
+    value back and restores the file if it doesn't round-trip.
     """
+    if "${" in value or "\n" in value or "\r" in value:
+        # python-dotenv expands ${VAR} even in single quotes; newlines break the file
+        logger.error("Refusing to write %s: value contains ${ or a newline", key)
+        return False
+
+    new_line = f"{key}={_quote_env_value(value)}\n"
+    pattern = re.compile(rf"^{re.escape(key)}=")
     try:
-        lines = []
-        found = False
-        if os.path.exists(filepath):
-            with open(filepath, "r", encoding="utf-8") as f:
-                lines = f.readlines()
+        with open(filepath, "a+", encoding="utf-8") as f:
+            fcntl.flock(f, fcntl.LOCK_EX)  # serialize concurrent saves
+            f.seek(0)
+            original = f.read()
+            lines = original.splitlines(keepends=True)
+            if lines and not lines[-1].endswith("\n"):
+                lines[-1] += "\n"
 
-        # Quote value if it contains special shell characters
-        if "'" in value:
-            # Single quotes inside — use double quotes with escaping
-            escaped = value.replace("\\", "\\\\").replace('"', '\\"').replace("$", "\\$").replace("`", "\\`")
-            quoted = f'"{escaped}"'
-        elif any(c in value for c in ' &$!#"\\`|;(){}[]<>'):
-            quoted = f"'{value}'"
-        else:
-            quoted = value
+            for i, line in enumerate(lines):
+                if pattern.match(line):
+                    lines[i] = new_line
+                    break
+            else:
+                lines.append(new_line)
 
-        new_line = f"{key}={quoted}\n"
-        pattern = re.compile(rf"^{re.escape(key)}=")
+            f.seek(0)
+            f.truncate()
+            f.write("".join(lines))
+            f.flush()
 
-        for i, line in enumerate(lines):
-            if pattern.match(line):
-                lines[i] = new_line
-                found = True
-                break
-
-        if not found:
-            lines.append(new_line)
-
-        with open(filepath, "w", encoding="utf-8") as f:
-            f.writelines(lines)
+            f.seek(0)
+            if dotenv_values(stream=io.StringIO(f.read())).get(key) != value:
+                f.seek(0)
+                f.truncate()
+                f.write(original)
+                logger.error("Write check failed for %s — .env restored", key)
+                return False
         return True
     except Exception as exc:
         logger.error("Failed to write %s to %s: %s", key, filepath, exc)

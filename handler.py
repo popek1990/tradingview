@@ -9,13 +9,12 @@ import re
 import textwrap
 import threading
 import time
+from types import SimpleNamespace
 from typing import Any
 from urllib.parse import urlparse
 
 import requests
 from discord_webhook import DiscordEmbed, DiscordWebhook
-from telegram import Bot
-from telegram.error import TelegramError
 
 from config import get_settings
 
@@ -23,6 +22,64 @@ logger = logging.getLogger(__name__)
 
 NETWORK_TIMEOUT = 10  # seconds — timeout for network operations
 REGEX_WEBHOOK_ID = re.compile(r"^[a-zA-Z0-9/_\-]+$")  # Allowed chars in webhook ID
+
+TG_API = "https://api.telegram.org"
+TG_MAX_RETRY_AFTER = 10  # seconds — longer 429 waits would exceed the dispatch timeout
+
+
+class TelegramError(Exception):
+    """Telegram Bot API error (never contains the bot token)."""
+
+    def __init__(self, description: str, retry_after: int | None = None):
+        super().__init__(description)
+        self.retry_after = retry_after
+
+
+class Bot:
+    """Minimal Telegram Bot API client — only what this app uses.
+
+    Replaces python-telegram-bot 13.6, which pinned urllib3<2 for the whole app.
+    """
+
+    def __init__(self, token: str):
+        self._token = token
+
+    def _call(self, method: str, timeout: float, **params: Any) -> dict:
+        url = f"{TG_API}/bot{self._token}/{method}"
+        try:
+            resp = requests.post(url, json=params, timeout=timeout)
+            data = resp.json()
+        except (requests.RequestException, ValueError) as e:
+            # str(e) of a requests error contains the URL, i.e. the token
+            raise TelegramError(f"network error ({type(e).__name__})") from None
+        if not data.get("ok"):
+            retry_after = (data.get("parameters") or {}).get("retry_after")
+            raise TelegramError(data.get("description", f"HTTP {resp.status_code}"), retry_after)
+        return data["result"]
+
+    def sendMessage(self, chat_id: str, text: str, parse_mode: str | None = None,
+                    timeout: float = NETWORK_TIMEOUT,
+                    disable_web_page_preview: bool = False) -> dict:
+        """Sends a message; waits and retries (twice) when Telegram answers 429."""
+        params: dict[str, Any] = {"chat_id": chat_id, "text": text,
+                                  "disable_web_page_preview": disable_web_page_preview}
+        if parse_mode:
+            params["parse_mode"] = parse_mode
+        retries = 0
+        while True:
+            try:
+                return self._call("sendMessage", timeout, **params)
+            except TelegramError as e:
+                retries += 1
+                if e.retry_after is None or e.retry_after > TG_MAX_RETRY_AFTER or retries > 2:
+                    raise
+                logger.warning("Telegram: rate limited, retrying in %ss", e.retry_after)
+                time.sleep(e.retry_after)
+
+    def get_chat(self, chat_id: str, timeout: float = NETWORK_TIMEOUT) -> Any:
+        result = self._call("getChat", timeout, chat_id=chat_id)
+        return SimpleNamespace(title=result.get("title"), username=result.get("username"))
+
 
 # Telegram bot cache (invalidated on token change, thread-safe)
 _tg_bot_lock = threading.Lock()

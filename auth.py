@@ -184,24 +184,20 @@ def _validate_token(token: str, secret: str) -> bool:
 def _get_client_ip() -> str:
     """Best-effort client IP for per-IP brute-force tracking in Streamlit.
 
-    Priority: Cf-Connecting-Ip (Cloudflare, not spoofable behind tunnel)
-    > X-Real-Ip (peer/proxy IP, non-loopback only) > "unknown".
-    X-Forwarded-For removed — spoofable without trusted proxy chain.
+    Priority: Cf-Connecting-Ip (set by Cloudflare, not spoofable behind the
+    tunnel) > TCP peer address (non-loopback) > "unknown".
+    X-Forwarded-For is ignored — spoofable without a trusted proxy chain.
+    Uses st.context: the old ctx.request no longer exists in Streamlit 1.52,
+    which made every client "unknown" and the lockout global.
     """
     try:
-        ctx = st.runtime.scriptrunner.get_script_run_ctx()
-        if ctx and hasattr(ctx, "request") and ctx.request:
-            headers = getattr(ctx.request, "headers", {})
+        cf_ip = st.context.headers.get("Cf-Connecting-Ip", "")
+        if cf_ip:
+            return cf_ip.strip()
 
-            # Cloudflare Tunnel sets this — not spoofable behind the tunnel
-            cf_ip = headers.get("Cf-Connecting-Ip", "")
-            if cf_ip:
-                return cf_ip
-
-            # Fallback: peer IP from proxy (non-loopback only)
-            peer_ip = headers.get("X-Real-Ip", "")
-            if peer_ip and not peer_ip.startswith("127.") and peer_ip != "::1":
-                return peer_ip
+        peer_ip = st.context.ip_address or ""
+        if peer_ip and not peer_ip.startswith("127.") and peer_ip != "::1":
+            return peer_ip
     except Exception:
         pass
     return "unknown"
@@ -331,6 +327,7 @@ def check_login():
                 _save_ip_locks(ip_locks)
             except Exception as e:
                 logger.warning("Failed to persist IP locks: %s", e)
+            logger.info("Panel login from %s", client_ip)
             new_token = _create_token(_get_hmac_key())
             st.session_state["session_token"] = new_token
             st.query_params[SESSION_PARAM] = new_token
@@ -340,9 +337,13 @@ def check_login():
                 if client_ip not in ip_locks:
                     ip_locks[client_ip] = {"fail_count": 0, "block_until": 0.0}
                 ip_locks[client_ip]["fail_count"] += 1
+                logger.warning("Failed panel login from %s (%d/%d)", client_ip,
+                               ip_locks[client_ip]["fail_count"], MAX_ATTEMPTS)
                 if ip_locks[client_ip]["fail_count"] >= MAX_ATTEMPTS:
                     ip_locks[client_ip]["block_until"] = time.time() + LOCKOUT_SECONDS
                     ip_locks[client_ip]["fail_count"] = 0
+                    logger.warning("Panel login locked for %s (%d min)", client_ip,
+                                   LOCKOUT_SECONDS // 60)
                     st.error(f"Locked for {LOCKOUT_SECONDS // 60} minutes!")
                 else:
                     remaining = MAX_ATTEMPTS - ip_locks[client_ip]["fail_count"]

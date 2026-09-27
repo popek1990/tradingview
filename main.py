@@ -50,7 +50,7 @@ class SecKeyFilter(logging.Filter):
     """Masks webhook keys in URL paths: /webhook/ANYTHING → /webhook/***."""
 
     import re as _re
-    _PATTERN = _re.compile(r"/webhook/[^/\s?#]+")
+    _PATTERN = _re.compile(r"/webhook/[^/\s?#%]+")  # no "%": keep format placeholders intact
 
     def filter(self, record: logging.LogRecord) -> bool:
         if hasattr(record, "msg") and isinstance(record.msg, str):
@@ -64,9 +64,11 @@ class SecKeyFilter(logging.Filter):
         return True
 
 
-# Apply SecKeyFilter to root logger so all access logs get masked
-logging.getLogger().addFilter(SecKeyFilter())
-# Also apply to uvicorn access logger
+# Logger filters don't see records propagated from child loggers, so the
+# filter goes on the root handlers (covers every module's records)...
+for _handler in logging.getLogger().handlers:
+    _handler.addFilter(SecKeyFilter())
+# ...and on uvicorn's access logger, which has its own handler
 logging.getLogger("uvicorn.access").addFilter(SecKeyFilter())
 
 # Rate limiting — use CF-Connecting-IP behind Cloudflare Tunnel
@@ -139,11 +141,15 @@ async def limit_body_size(request: Request, call_next):
     except ValueError:
         return JSONResponse(status_code=400, content={"detail": "Invalid Content-Length"})
 
-    # Verify actual body size (handles chunked encoding and lying clients)
+    # Verify actual body size (handles chunked encoding and lying clients).
+    # Read in chunks and stop at the limit — never buffer an oversized body.
     if request.method in ("POST", "PUT", "PATCH"):
-        body = await request.body()
-        if len(body) > MAX_BODY_SIZE:
-            return JSONResponse(status_code=413, content={"detail": "Payload too large"})
+        body = b""
+        async for chunk in request.stream():
+            body += chunk
+            if len(body) > MAX_BODY_SIZE:
+                return JSONResponse(status_code=413, content={"detail": "Payload too large"})
+        request._body = body  # lets the endpoint read the already-consumed body
 
     return await call_next(request)
 
@@ -304,15 +310,17 @@ async def _handle_webhook(request: Request, key_from_url: str | None) -> dict:
     return {"status": "ok", "channels": results}
 
 
+# TradingView sends from only 4 IPs, so a per-IP limit must allow bursts
+# of alerts across a whole watchlist
 @app.post("/webhook")
-@limiter.limit("30/minute")
+@limiter.limit("120/minute")
 async def webhook(request: Request):
     """Webhook endpoint — old format with key in JSON body."""
     return await _handle_webhook(request, key_from_url=None)
 
 
 @app.post("/webhook/{key}")
-@limiter.limit("30/minute")
+@limiter.limit("120/minute")
 async def webhook_with_key(request: Request, key: str = Path(..., max_length=256)):
     """Webhook endpoint — key in URL (deprecated), body as JSON or plain text."""
     logger.warning(
@@ -333,6 +341,12 @@ async def reload_config(request: Request):
 
     Restricted to internal Docker network (172.x) and localhost.
     """
+    # Traffic from the Cloudflare tunnel also arrives from a private Docker IP,
+    # so the IP check alone lets the internet in. Cloudflare adds
+    # CF-Connecting-IP to every tunnelled request; the panel's call never has it.
+    if request.headers.get("CF-Connecting-IP"):
+        raise HTTPException(status_code=403, detail="Access only from internal network")
+
     # Use actual TCP source IP for access control (not spoofable headers)
     raw_ip = request.client.host if request.client else None
     if not raw_ip:

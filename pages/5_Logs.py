@@ -12,11 +12,16 @@ st.set_page_config(page_title="TradingView Alerts", page_icon="viking_logo.jpg",
 
 check_login()
 
-LOG_FILE_PATH = "logs/webhook.log"
+LOG_FILES = {
+    "WEBHOOK (alerts)": "logs/webhook.log",
+    "PANEL (logins, config changes)": "logs/dashboard.log",
+}
 st.subheader("SYSTEM OPERATIONAL LOGS")
 
 # Filters
 with st.container(border=True):
+    source = st.radio("SOURCE", list(LOG_FILES), horizontal=True)
+    LOG_FILE_PATH = LOG_FILES[source]
     col1, col2, col3 = st.columns([1, 2, 1])
     with col1:
         level = st.selectbox("LEVEL FILTER", ["ALL", "ERROR", "WARNING", "INFO", "DEBUG"])

@@ -1,22 +1,7 @@
-# Server
-fastapi>=0.135.0,<0.136
-uvicorn[standard]>=0.41.0,<0.42
-pydantic-settings>=2.13.0,<2.14
-python-dotenv>=1.2.0,<1.3
-
-# Notification channels
-python-telegram-bot==13.6
-urllib3<2                        # required by python-telegram-bot 13.6
-discord-webhook>=1.4.0,<1.5
-
-# Security
-slowapi>=0.1.9,<0.2
-
-# HTTP
-requests>=2.32.0,<2.33
-
-# Frontend
-streamlit>=1.52.0,<1.53
+# Everything, for local development and tests.
+# Docker images install only their own file.
+-r requirements-webhook.txt
+-r requirements-dashboard.txt
 
 # Testing
 pytest>=8.4.0,<8.5

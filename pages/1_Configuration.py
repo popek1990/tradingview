@@ -15,63 +15,63 @@ settings = Settings()
 
 st.subheader("SECURITY CONFIGURATION")
 
+# Secrets are never sent back to the browser: fields start empty and an empty
+# field keeps the current value.
+def _state(value: str) -> str:
+    return "currently: SET ••••" if value else "currently: NOT SET"
+
+
 with st.form("form_keys", border=True):
+    st.caption("Leave a field empty to keep its current value.")
     st.markdown("#### ACCESS CONTROL")
     sec_key = st.text_input(
         "SEC_KEY (Auth key for Webhooks)",
-        value=settings.sec_key,
-        type="password",
+        type="password", placeholder=_state(settings.sec_key),
         help="Min. 16 chars. Must match the key set in TradingView. "
              "Generate with: python3 -c \"import secrets; print(secrets.token_urlsafe(32))\"",
     )
     dashboard_password = st.text_input(
         "DASHBOARD_PASSWORD (Panel Access)",
-        value=settings.dashboard_password,
-        type="password",
-        help="Password for logging into this panel.",
+        type="password", placeholder=_state(settings.dashboard_password),
+        help="Password for logging into this panel (min. 8 chars).",
     )
 
     st.markdown("---")
     st.markdown("#### GATEWAYS & TOKENS")
     tg_token = st.text_input(
         "TG_TOKEN (Telegram Bot Token)",
-        value=settings.tg_token,
-        type="password",
+        type="password", placeholder=_state(settings.tg_token),
     )
     discord_webhook = st.text_input(
         "DISCORD_WEBHOOK (Webhook ID/Secret)",
-        value=settings.discord_webhook,
-        type="password",
+        type="password", placeholder=_state(settings.discord_webhook),
     )
     slack_webhook = st.text_input(
         "SLACK_WEBHOOK (Webhook ID)",
-        value=settings.slack_webhook,
-        type="password",
+        type="password", placeholder=_state(settings.slack_webhook),
     )
 
     submit = st.form_submit_button("SUBMIT CONFIGURATION", use_container_width=True)
 
 if submit:
-    if not dashboard_password.strip():
-        st.error("DASHBOARD_PASSWORD cannot be empty!")
-        st.stop()
-    if len(dashboard_password.strip()) < 8:
-        st.error("DASHBOARD_PASSWORD must be at least 8 characters!")
-        st.stop()
-
-    if not sec_key.strip():
-        st.error("SEC_KEY cannot be empty!")
-        st.stop()
-    if len(sec_key.strip()) < 16:
-        st.error("SEC_KEY must be at least 16 characters!")
-        st.stop()
-
     # Strip whitespace from all credentials to prevent silent auth failures
-    fields = {
+    entered = {
         "SEC_KEY": sec_key.strip(),
         "TG_TOKEN": tg_token.strip(),
         "DISCORD_WEBHOOK": discord_webhook.strip(),
         "SLACK_WEBHOOK": slack_webhook.strip(),
         "DASHBOARD_PASSWORD": dashboard_password.strip(),
     }
+    fields = {k: v for k, v in entered.items() if v}
+
+    if not fields:
+        st.info("NOTHING CHANGED")
+        st.stop()
+    if "DASHBOARD_PASSWORD" in fields and len(fields["DASHBOARD_PASSWORD"]) < 8:
+        st.error("DASHBOARD_PASSWORD must be at least 8 characters!")
+        st.stop()
+    if "SEC_KEY" in fields and len(fields["SEC_KEY"]) < 16:
+        st.error("SEC_KEY must be at least 16 characters!")
+        st.stop()
+
     save_and_reload(fields)

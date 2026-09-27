@@ -3,8 +3,8 @@ FROM python:3.12-slim
 LABEL maintainer="popek1990"
 WORKDIR /usr/src/app
 
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements-webhook.txt ./
+RUN pip install --no-cache-dir -r requirements-webhook.txt
 
 COPY main.py handler.py config.py templates.py aliases.py ./
 

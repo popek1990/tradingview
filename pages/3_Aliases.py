@@ -77,6 +77,44 @@ with st.expander("What are aliases?", expanded=False):
 
 aliases = load_aliases()
 
+# --- Backup: export / import (the data volume is the only copy of aliases) ---
+with st.expander("BACKUP: EXPORT / IMPORT", expanded=False):
+    import json as _json
+    from datetime import datetime as _dt
+    st.download_button(
+        "EXPORT ALIASES (JSON)",
+        data=_json.dumps(aliases, ensure_ascii=False, indent=2),
+        file_name=f"aliases-{_dt.now():%Y-%m-%d}.json",
+        mime="application/json",
+        use_container_width=True,
+    )
+    uploaded = st.file_uploader("IMPORT FROM FILE (replaces all aliases)", type="json")
+    confirm_import = st.checkbox("I understand the current aliases will be replaced")
+    if uploaded is not None and st.button("IMPORT", disabled=not confirm_import,
+                                          use_container_width=True):
+        try:
+            imported = _json.loads(uploaded.getvalue().decode("utf-8"))
+            if not isinstance(imported, dict) or len(imported) > MAX_ALIASES:
+                raise ValueError(f"expected an object with at most {MAX_ALIASES} aliases")
+            for alias_name, alias_def in imported.items():
+                if not REGEX_NAME.match(alias_name):
+                    raise ValueError(f"invalid alias name '{alias_name}'")
+                if (not isinstance(alias_def, dict)
+                        or not isinstance(alias_def.get("template"), str)
+                        or not isinstance(alias_def.get("variables", []), list)):
+                    raise ValueError(f"/{alias_name}: needs 'template' (text) and 'variables' (list)")
+                validate_variable_names(alias_def.get("variables", []))
+                bracketed = find_bracketed_vars(alias_def["template"], alias_def.get("variables", []))
+                if bracketed:
+                    raise ValueError(f"/{alias_name}: uses [{bracketed[0]}] instead of {{{bracketed[0]}}}")
+        except (ValueError, UnicodeDecodeError) as e:
+            st.error(f"IMPORT REJECTED: {e}")
+            st.stop()
+        with get_aliases_lock():
+            save_aliases(imported)
+        st.success(f"IMPORTED {len(imported)} ALIASES")
+        st.rerun()
+
 # Edit and delete state
 if "edit_alias" not in st.session_state:
     st.session_state.edit_alias = None
@@ -231,7 +269,8 @@ if aliases:
         just_saved = st.session_state.just_saved_alias == name
         if just_saved:
             st.session_state.just_saved_alias = None
-        keep_open = just_saved or st.session_state.confirm_delete_alias == name
+        keep_open = (just_saved or st.session_state.confirm_delete_alias == name
+                     or st.session_state.get("reveal_json_alias") == name)
         with st.expander(f"/`{name.upper()}`", expanded=keep_open):
             col_preview, col_controls = st.columns([5, 1])
             with col_preview:
@@ -289,7 +328,13 @@ if aliases:
                         st.rerun()
                 st.markdown('</div>', unsafe_allow_html=True)
 
-            # TradingView ready-to-paste JSON with SEC_KEY and alias
+            # TradingView ready-to-paste JSON with SEC_KEY and alias.
+            # SEC_KEY reaches the browser only for the alias the user asked for.
+            if st.session_state.get("reveal_json_alias") != name:
+                if st.button("SHOW TRADINGVIEW JSON (contains SEC_KEY)", key=f"ajson_{name}"):
+                    st.session_state.reveal_json_alias = name
+                    st.rerun()
+                continue
             import json as _json
             variables = data.get("variables", [])
             safe_name = html.escape(name)

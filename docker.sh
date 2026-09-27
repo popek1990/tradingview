@@ -1,22 +1,35 @@
 #!/bin/bash
-
 # Quick update & rebuild script for TradingView-Webhook-Bot
-# Usage: ./docker.sh
-
-echo "Stopping containers..."
-docker compose down
+# Usage: ./docker.sh   (run as root from the project directory)
+#
+# Order matters: the old containers keep receiving alerts while the new images
+# build — TradingView does not retry a webhook that finds the server down.
+set -euo pipefail
+cd "$(dirname "$0")"
 
 echo "Pulling latest changes from GitHub..."
-git pull origin main
+git pull --ff-only origin main
 
-# Dashboard container runs as non-root (appuser, UID 1000).
-# .env must be writable since the dashboard saves config changes to it.
-echo "Fixing .env permissions for dashboard..."
+echo "Backing up aliases (data volume)..."
+mkdir -p backups
+if docker compose ps --status running --services 2>/dev/null | grep -qx dashboard; then
+    docker compose cp dashboard:/usr/src/app/data/aliases.json \
+        "backups/aliases-$(date +%Y%m%d-%H%M%S).json" \
+        || echo "WARNING: alias backup failed — continuing"
+fi
+
+# Both containers run as appuser (UID 1000): the webhook reads .env, the
+# dashboard writes it. Nobody else on the host needs access to the secrets.
+echo "Securing .env..."
 touch .env
-chmod 666 .env
+chown 1000:1000 .env
+chmod 600 .env
 
-echo "Rebuilding images and starting (detached)..."
-docker compose up -d --build
+echo "Building images (old containers still running)..."
+docker compose build
+
+echo "Starting new containers..."
+docker compose up -d
 
 echo "Cleaning up unused images..."
 docker image prune -f
