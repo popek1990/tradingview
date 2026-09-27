@@ -433,6 +433,20 @@ class TestIntervalRaw:
         assert result == "BTCUSD only"
 
 
+class TestFindBracketedVars:
+    """Unit tests for find_bracketed_vars() — [var] is never substituted."""
+
+    def test_detects_bracketed_vars_in_chart_link(self):
+        from aliases import find_bracketed_vars
+        template = "${ticker} [Tradingview](https://www.tradingview.com/chart/?symbol=[exchange]:[ticker]&interval={interval_raw})"
+        assert find_bracketed_vars(template, ["ticker", "close", "interval", "exchange"]) == ["ticker", "exchange"]
+
+    def test_valid_template_passes(self):
+        from aliases import find_bracketed_vars
+        template = "[Tradingview](https://www.tradingview.com/chart/?symbol={exchange}:{ticker})"
+        assert find_bracketed_vars(template, ["ticker", "exchange"]) == []
+
+
 class TestReloadConfig:
     @pytest.mark.asyncio
     async def test_valid_reload(self, client):

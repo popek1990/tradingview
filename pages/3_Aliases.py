@@ -8,7 +8,7 @@ import requests
 import streamlit as st
 import streamlit.components.v1 as components
 from auth import check_login
-from aliases import get_lock as get_aliases_lock, load_aliases, load_aliases_unlocked, save_aliases, validate_variable_names
+from aliases import get_lock as get_aliases_lock, load_aliases, find_bracketed_vars, load_aliases_unlocked, save_aliases, validate_variable_names
 
 def _check_template_vars(template: str, variables: list[str]) -> str | None:
     """Returns warning message if template placeholders don't match declared variables."""
@@ -121,6 +121,10 @@ if editing and editing in aliases:
             except ValueError as e:
                 st.error(str(e))
                 st.stop()
+            bracketed = find_bracketed_vars(template, parsed_vars)
+            if bracketed:
+                st.error("USE {VAR}, NOT [VAR]: " + ", ".join(f"[{v}] → {{{v}}}" for v in bracketed))
+                st.stop()
             var_warning = _check_template_vars(template, parsed_vars)
             if var_warning:
                 st.warning(f"Variable mismatch: {var_warning}")
@@ -179,6 +183,10 @@ if not editing:
             except ValueError as e:
                 st.error(str(e))
                 st.stop()
+            bracketed = find_bracketed_vars(new_template, parsed_vars)
+            if bracketed:
+                st.error("USE {VAR}, NOT [VAR]: " + ", ".join(f"[{v}] → {{{v}}}" for v in bracketed))
+                st.stop()
             var_warning = _check_template_vars(new_template, parsed_vars)
             if var_warning:
                 st.warning(f"Variable mismatch: {var_warning}")
@@ -223,10 +231,10 @@ if aliases:
                 variables = data.get("variables", [])
                 st.markdown("**VARIABLES:** " + (", ".join(f"`{v}`" for v in variables) if variables else "_none_"))
 
-                preview = data["template"]
-                for v in variables:
-                    preview = preview.replace(f"{{{v}}}", f"[{v}]")
-                st.code(preview, language=None)
+                # Show the raw template — it gets copied back into templates,
+                # so placeholders must stay as {var} (a "[var]" preview once
+                # ended up verbatim in /strong's chart link)
+                st.code(data["template"], language=None)
 
             with col_controls:
                 st.markdown('<div class="small-btn">', unsafe_allow_html=True)

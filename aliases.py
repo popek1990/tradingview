@@ -59,6 +59,15 @@ def validate_variable_names(variables: list[str]) -> None:
             raise ValueError(f"Invalid variable name: '{v}' (use a-z, A-Z, 0-9, _)")
 
 
+def find_bracketed_vars(template: str, variables: list[str]) -> list[str]:
+    """Returns declared variables written as [var] instead of {var}.
+
+    "[var]" is never substituted, so e.g. a chart link with
+    symbol=[exchange]:[ticker] reaches Telegram verbatim and is broken.
+    """
+    return [v for v in variables if f"[{v}]" in template]
+
+
 def save_aliases(aliases: dict) -> None:
     """Saves aliases to JSON file atomically (tempfile + os.replace)."""
     with _lock:
