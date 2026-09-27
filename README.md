@@ -95,6 +95,14 @@ Aliases let you use short commands instead of writing long messages. Define them
 
 TradingView sends something like `/spot BTCUSDT BINANCE 68000` — the webhook expands it using the alias template you defined.
 
+In the alias template, write variables in single curly braces — `{ticker}`, `{exchange}`, `{close}`. If you declare `interval`, `{interval_raw}` is also available (the raw value, e.g. `60` or `1D`) for chart links:
+
+```
+[Tradingview](https://www.tradingview.com/chart/?symbol={exchange}:{ticker}&interval={interval_raw})
+```
+
+Square brackets such as `[ticker]` are never substituted, so the dashboard refuses to save a template that uses them for a declared variable.
+
 ![Alias in TradingView Message field](alias_example.png)
 ![Alias output in Telegram](alias_output_example.png)
 
